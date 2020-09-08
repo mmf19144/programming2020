@@ -7,5 +7,6 @@ int main() {
     std::cout << "Second number:" << std::endl;
     std::cin >> b;
     std::cout << a + b << std::endl;
+    return 0;
 }
 
