@@ -1,0 +1,3 @@
+C:/Users/Tom/CLionProjects/programming2020/kikht/hello-world/cmake-build-debug/CMakeFiles/programming2020.dir
+C:/Users/Tom/CLionProjects/programming2020/kikht/hello-world/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/Tom/CLionProjects/programming2020/kikht/hello-world/cmake-build-debug/CMakeFiles/rebuild_cache.dir
