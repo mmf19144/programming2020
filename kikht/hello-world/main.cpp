@@ -5,7 +5,7 @@ int main(int argc, char** argv) {
     if (argc > 1) {
         std::cout << argv[1];
     } else {
-        std::cout << "world";
+        std::cout << "world";//esketit
     }
     std::cout << "!" << std::endl;
     return 0;//test1
