@@ -15,6 +15,7 @@ public:
     int &operator[](size_t col) {
         return matrix[rowIdx * matrixSize + col];
     }
+
     friend std::ofstream &operator<<(std::ofstream &os, const MatrixRow &m) {
         for (size_t i = 0; i < m.matrixSize; i++) {
             os << m.matrix[m.rowIdx * m.matrixSize + i];
@@ -24,6 +25,7 @@ public:
         }
         return os;
     }
+
     friend std::ostream &operator<<(std::ostream &os, const MatrixRow &m) {
         for (size_t i = 0; i < m.matrixSize; i++) {
             os << m.matrix[m.rowIdx * m.matrixSize + i];
@@ -52,13 +54,14 @@ public:
 
     friend std::ofstream &operator<<(std::ofstream &os, const MatrixColumn &m) {
         for (size_t i = 0; i < m.matrixSize; i++) {
-                os << m.matrix[i * m.matrixSize + m.colIdx];
-                if (i + 1 != m.matrixSize)
-                    os << " ";
+            os << m.matrix[i * m.matrixSize + m.colIdx];
+            if (i + 1 != m.matrixSize)
+                os << " ";
             os << "\n";
         }
         return os;
     }
+
     friend std::ostream &operator<<(std::ostream &os, const MatrixColumn &m) {
         for (size_t i = 0; i < m.matrixSize; i++) {
             os << m.matrix[i * m.matrixSize + m.colIdx];
@@ -81,8 +84,8 @@ private:
             matrix[i] = 0;
 
         }
-        for (size_t i = 0; i < size ; ++i)
-            matrix[i*size + i] = default_value;
+        for (size_t i = 0; i < size; ++i)
+            matrix[i * size + i] = default_value;
     }
 
 public:
@@ -120,12 +123,12 @@ public:
         Matrix minor(size - 1);
         bool new_row = false, new_column = false;
         for (size_t i = 0; i < size; i++) {
-            if (i == row - 1) {
+            if (i == row) {
                 new_row = true;
                 continue;
             }
             for (size_t j = 0; j < size; j++) {
-                if (i == column - 1) {
+                if (j == column) {
                     new_row = true;
                     continue;
                 }
@@ -282,6 +285,7 @@ int main() {
 //
 //    d(1)[0] =5;
 
-    fout<<d;
+    fout << d;
+//    fout << d(0,1);
     return 0;
 }
