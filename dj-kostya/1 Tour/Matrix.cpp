@@ -1,55 +1,117 @@
 #include <iostream>
 #include <fstream>
 
+
+class MatrixRow {
+private:
+    size_t rowIdx;
+    const size_t matrixSize;
+    int *matrix;
+public:
+    MatrixRow() : rowIdx(0), matrixSize(0), matrix(nullptr) {}
+
+    MatrixRow(size_t size, size_t row, int *m) : rowIdx(row), matrixSize(size), matrix(m) {}
+
+    int &operator[](size_t col) {
+        return matrix[rowIdx * matrixSize + col];
+    }
+    friend std::ofstream &operator<<(std::ofstream &os, const MatrixRow &m) {
+        for (size_t i = 0; i < m.matrixSize; i++) {
+            os << m.matrix[m.rowIdx * m.matrixSize + i];
+            if (i + 1 != m.matrixSize)
+                os << " ";
+            os << "\n";
+        }
+        return os;
+    }
+    friend std::ostream &operator<<(std::ostream &os, const MatrixRow &m) {
+        for (size_t i = 0; i < m.matrixSize; i++) {
+            os << m.matrix[m.rowIdx * m.matrixSize + i];
+            if (i + 1 != m.matrixSize)
+                os << " ";
+            os << "\n";
+        }
+        return os;
+    }
+
+};
+
+class MatrixColumn {
+private:
+    size_t colIdx;
+    const size_t matrixSize;
+    int *matrix;
+public:
+    MatrixColumn() : colIdx(0), matrixSize(0), matrix(nullptr) {}
+
+    MatrixColumn(size_t size, size_t row, int *m) : colIdx(row), matrixSize(size), matrix(m) {}
+
+    int &operator[](size_t row) {
+        return matrix[row * matrixSize + colIdx];
+    }
+
+    friend std::ofstream &operator<<(std::ofstream &os, const MatrixColumn &m) {
+        for (size_t i = 0; i < m.matrixSize; i++) {
+                os << m.matrix[i * m.matrixSize + m.colIdx];
+                if (i + 1 != m.matrixSize)
+                    os << " ";
+            os << "\n";
+        }
+        return os;
+    }
+    friend std::ostream &operator<<(std::ostream &os, const MatrixColumn &m) {
+        for (size_t i = 0; i < m.matrixSize; i++) {
+            os << m.matrix[i * m.matrixSize + m.colIdx];
+            if (i + 1 != m.matrixSize)
+                os << " ";
+            os << "\n";
+        }
+        return os;
+    }
+};
+
+
 class Matrix {
 private:
     const size_t size;
-    int **matrix;
+    int *matrix;
 
+    void init_empty(int default_value = 1) {
+        for (size_t i = 0; i < size * size; ++i) {
+            matrix[i] = 0;
+
+        }
+        for (size_t i = 0; i < size ; ++i)
+            matrix[i*size + i] = default_value;
+    }
 
 public:
     Matrix() : size(0),
                matrix(nullptr) {
     }
 
-    Matrix(const size_t new_size) : size(new_size),
-                                    matrix(new int *[new_size]) {
-        for (size_t i = 0; i < new_size; ++i) {
-            matrix[i] = new int[new_size];
-            for (size_t j = 0; j < new_size; ++j)
-                matrix[i][j] = 0;
-            matrix[i][i] = 1;
-        }
+    explicit Matrix(const size_t new_size) : size(new_size),
+                                             matrix(new int[new_size * new_size]) {
+        init_empty(1);
     }
 
     Matrix(const size_t new_size, const size_t k) : size(new_size),
-                                                    matrix(new int *[new_size]) {
-        for (size_t i = 0; i < new_size; ++i) {
-            matrix[i] = new int[new_size];
-            for (size_t j = 0; j < new_size; ++j)
-                matrix[i][j] = 0;
-            matrix[i][i] = k;
-        }
+                                                    matrix(new int[new_size * new_size]) {
+        init_empty(k);
     }
 
     Matrix(size_t new_size, const int diagonal[]) : Matrix(new_size) {
         for (size_t i = 0; i < new_size; i++)
-            matrix[i][i] = diagonal[i];
+            matrix[i * size + i] = diagonal[i];
     }
 
     ~Matrix() {
-        for (size_t i = 0; i < size; i++)
-            delete[] matrix[i];
         delete[] matrix;
     }
 
     size_t getSize() const {
         return size;
     }
-
-//    int **getMatrix() {
-//        return matrix;
-//    }
 
     Matrix getMinor(size_t row, size_t column) const {
         if (size == 0 || size < row || size < column)
@@ -67,7 +129,7 @@ public:
                     new_row = true;
                     continue;
                 }
-                minor.matrix[i - new_row][j - new_column] = matrix[i][j];
+                minor.matrix[(i - new_row) * size + j - new_column] = matrix[i * size + j];
             }
         }
         return minor;
@@ -80,7 +142,7 @@ public:
         Matrix sum(sum_size);
         for (size_t i = 0; i < sum_size; i++) {
             for (size_t j = 0; j < sum_size; j++) {
-                sum.matrix[i][j] = matrix[i][j] + b.matrix[i][j];
+                sum.matrix[i * size + j] = matrix[i * size + j] + b.matrix[i * size + j];
             }
         }
         return sum;
@@ -93,7 +155,7 @@ public:
         Matrix sum(sum_size);
         for (size_t i = 0; i < sum_size; i++) {
             for (size_t j = 0; j < sum_size; j++) {
-                sum.matrix[i][j] = matrix[i][j] - b.matrix[i][j];
+                sum.matrix[i * size + j] = matrix[i * size + j] - b.matrix[i * size + j];
             }
         }
         return sum;
@@ -107,9 +169,9 @@ public:
         Matrix multi(multi_size);
         for (size_t i = 0; i < multi_size; i++) {
             for (size_t j = 0; j < multi_size; j++) {
-                multi.matrix[i][j] = 0;
+                multi.matrix[i * size + j] = 0;
                 for (size_t u = 0; u < multi_size; u++)
-                    multi.matrix[i][j] += matrix[i][u] * b.matrix[u][j];
+                    multi.matrix[i * size + j] += matrix[i * size + u] * b.matrix[u * size + j];
             }
         }
         return multi;
@@ -119,7 +181,7 @@ public:
         Matrix trans(size);
         for (size_t i = 0; i < size; i++) {
             for (size_t j = 0; j < size; j++)
-                trans.matrix[i][j] = matrix[j][i];
+                trans.matrix[i * size + j] = matrix[j * size + i];
         }
         return trans;
     }
@@ -132,7 +194,7 @@ public:
         Matrix negative(size);
         for (size_t i = 0; i < size; i++) {
             for (size_t j = 0; j < size; j++)
-                negative.matrix[i][j] = -matrix[i][j];
+                negative.matrix[i * size + j] = -matrix[i * size + j];
         }
         return negative;
     }
@@ -140,7 +202,7 @@ public:
     friend std::ofstream &operator<<(std::ofstream &os, const Matrix &m) {
         for (size_t i = 0; i < m.size; i++) {
             for (size_t j = 0; j < m.size; j++) {
-                os << m.matrix[i][j];
+                os << m.matrix[i * m.size + j];
                 if (j + 1 != m.size)
                     os << " ";
             }
@@ -150,10 +212,8 @@ public:
     }
 
     friend std::ifstream &operator>>(std::ifstream &os, const Matrix &m) {
-        for (size_t i = 0; i < m.size; i++) {
-            for (size_t j = 0; j < m.size; j++) {
-                os >> m.matrix[i][j];
-            }
+        for (size_t i = 0; i < m.size * m.size; i++) {
+            os >> m.matrix[i];
         }
         return os;
     }
@@ -162,7 +222,7 @@ public:
     friend std::ostream &operator<<(std::ostream &os, const Matrix &m) {
         for (size_t i = 0; i < m.size; i++) {
             for (size_t j = 0; j < m.size; j++) {
-                os << m.matrix[i][j];
+                os << m.matrix[i * m.size + j];
                 if (j + 1 != m.size)
                     os << " ";
             }
@@ -172,10 +232,8 @@ public:
     }
 
     friend std::istream &operator>>(std::istream &os, const Matrix &m) {
-        for (size_t i = 0; i < m.size; i++) {
-            for (size_t j = 0; j < m.size; j++) {
-                os >> m.matrix[i][j];
-            }
+        for (size_t i = 0; i < m.size * m.size; i++) {
+            os >> m.matrix[i];
         }
         return os;
     }
@@ -184,19 +242,17 @@ public:
         return getMinor(row, column);
     }
 
-    int *operator[](size_t row) {
+    MatrixRow operator[](size_t row) {
         if (size == 0 || size <= row)
             throw std::invalid_argument("Matrix has not valid dimension");
-        return matrix[row];
+        return {size, row, matrix};
     }
 
 
-
-
-    int * operator()(size_t column){
+    MatrixColumn operator()(size_t column) {
         if (size == 0 || size <= column)
             throw std::invalid_argument("Matrix has not valid dimension");
-        return T().matrix[column]; // TODO: rewrite to save ref not new instant
+        return {size, column, matrix};
     }
 
 };
@@ -214,6 +270,18 @@ int main() {
 
     fin >> A >> B >> C >> D;
 
-    fout << (A + B * (C.T()) + K) * (D.T());
+    //fout << (A + B * (C.T()) + K) * (D.T());
+
+    Matrix d = (A + B * (C.T()) + K) * (D.T());
+
+//    fout << d << d(1) << d[1];
+//
+//    d[1][0] = 4;
+//
+//    fout<<d;
+//
+//    d(1)[0] =5;
+
+    fout<<d;
     return 0;
 }
