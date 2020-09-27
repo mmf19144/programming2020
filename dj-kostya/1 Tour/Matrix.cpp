@@ -88,6 +88,20 @@ private:
             matrix[i * size + i] = default_value;
     }
 
+
+    friend bool is_equal(const Matrix &m1, const Matrix &m2) {
+        if (m1.getSize() != m2.getSize())
+            throw std::invalid_argument("Matrices a and b must have the same dimensions");
+
+        for (size_t i = 0; i < m1.size; i++) {
+            for (size_t j = 0; j < m1.size; j++) {
+                if (m1.matrix[i * m1.size + j] != m2.matrix[i * m2.size + j])
+                    return false;
+            }
+        }
+        return true;
+    }
+
 public:
     Matrix() : size(0),
                matrix(nullptr) {
@@ -258,6 +272,14 @@ public:
         return {size, column, matrix};
     }
 
+
+    friend bool operator==(const Matrix &m1, const Matrix &m2) {
+        return is_equal(m1, m2);
+    }
+
+    friend bool operator!=(const Matrix &m1, const Matrix &m2) {
+        return !is_equal(m1, m2);
+    }
 };
 
 
