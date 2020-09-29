@@ -1,46 +1,11 @@
 #include <iostream>
 #include <fstream>
+#include <cstring>
 
-
-class MatrixRow {
-private:
-    size_t rowIdx;
-    const size_t matrixSize;
-    int *matrix;
-public:
-    MatrixRow() : rowIdx(0), matrixSize(0), matrix(nullptr) {}
-
-    MatrixRow(size_t size, size_t row, int *m) : rowIdx(row), matrixSize(size), matrix(m) {}
-
-    int &operator[](size_t col) {
-        return matrix[rowIdx * matrixSize + col];
-    }
-
-    friend std::ofstream &operator<<(std::ofstream &os, const MatrixRow &m) {
-        for (size_t i = 0; i < m.matrixSize; i++) {
-            os << m.matrix[m.rowIdx * m.matrixSize + i];
-            if (i + 1 != m.matrixSize)
-                os << " ";
-            os << "\n";
-        }
-        return os;
-    }
-
-    friend std::ostream &operator<<(std::ostream &os, const MatrixRow &m) {
-        for (size_t i = 0; i < m.matrixSize; i++) {
-            os << m.matrix[m.rowIdx * m.matrixSize + i];
-            if (i + 1 != m.matrixSize)
-                os << " ";
-            os << "\n";
-        }
-        return os;
-    }
-
-};
 
 class MatrixColumn {
 private:
-    size_t colIdx;
+    const size_t colIdx;
     const size_t matrixSize;
     int *matrix;
 public:
@@ -52,27 +17,41 @@ public:
         return matrix[row * matrixSize + colIdx];
     }
 
-    friend std::ofstream &operator<<(std::ofstream &os, const MatrixColumn &m) {
-        for (size_t i = 0; i < m.matrixSize; i++) {
-            os << m.matrix[i * m.matrixSize + m.colIdx];
-            if (i + 1 != m.matrixSize)
-                os << " ";
-            os << "\n";
-        }
-        return os;
-    }
-
     friend std::ostream &operator<<(std::ostream &os, const MatrixColumn &m) {
         for (size_t i = 0; i < m.matrixSize; i++) {
             os << m.matrix[i * m.matrixSize + m.colIdx];
             if (i + 1 != m.matrixSize)
                 os << " ";
-            os << "\n";
         }
         return os;
     }
 };
 
+class MatrixRow {
+private:
+    const size_t rowIdx;
+    const size_t matrixSize;
+    int *matrix;
+public:
+    MatrixRow() : rowIdx(0), matrixSize(0), matrix(nullptr) {}
+
+    MatrixRow(size_t size, size_t row, int *m) : rowIdx(row), matrixSize(size), matrix(m) {}
+
+    int &operator[](size_t col) {
+        return matrix[rowIdx * matrixSize + col];
+    }
+
+    friend std::ostream &operator<<(std::ostream &os, const MatrixRow &m) {
+        for (size_t i = 0; i < m.matrixSize; i++) {
+            os << m.matrix[m.rowIdx * m.matrixSize + i];
+            if (i + 1 != m.matrixSize)
+                os << " ";
+        }
+        return os;
+    }
+
+
+};
 
 class Matrix {
 private:
@@ -80,10 +59,7 @@ private:
     int *matrix;
 
     void init_empty(int default_value = 1) {
-        for (size_t i = 0; i < size * size; ++i) {
-            matrix[i] = 0;
-
-        }
+        memset(matrix, 0, size * size * sizeof(int));
         for (size_t i = 0; i < size; ++i)
             matrix[i * size + i] = default_value;
     }
@@ -92,14 +68,7 @@ private:
     friend bool is_equal(const Matrix &m1, const Matrix &m2) {
         if (m1.getSize() != m2.getSize())
             throw std::invalid_argument("Matrices a and b must have the same dimensions");
-
-        for (size_t i = 0; i < m1.size; i++) {
-            for (size_t j = 0; j < m1.size; j++) {
-                if (m1.matrix[i * m1.size + j] != m2.matrix[i * m2.size + j])
-                    return false;
-            }
-        }
-        return true;
+        return memcmp(m1.matrix, m2.matrix, m1.size * m2.size * sizeof(int));
     }
 
 public:
@@ -119,7 +88,7 @@ public:
 
     Matrix(size_t new_size, const int diagonal[]) : Matrix(new_size) {
         for (size_t i = 0; i < new_size; i++)
-            matrix[i * size + i] = diagonal[i];
+            (*this)[i][i] = diagonal[i];
     }
 
     ~Matrix() {
@@ -131,64 +100,61 @@ public:
     }
 
     Matrix getMinor(size_t row, size_t column) const {
-        if (size == 0 || size < row || size < column)
+        if (size <= 1 || size < row || size < column || row <= 0 || column <= 0)
             throw std::invalid_argument("Matrix has not valid dimension");
 
         Matrix minor(size - 1);
         bool new_row = false, new_column = false;
         for (size_t i = 0; i < size; i++) {
-            if (i == row) {
+            if (i == row - 1) {
                 new_row = true;
                 continue;
             }
             for (size_t j = 0; j < size; j++) {
-                if (j == column) {
-                    new_row = true;
+                if (j == column - 1) {
+                    new_column = true;
                     continue;
                 }
-                minor.matrix[(i - new_row) * size + j - new_column] = matrix[i * size + j];
+                minor[i - new_row][j - new_column] = (*this)[i][j];
             }
         }
         return minor;
     }
 
-    Matrix operator+(const Matrix &b) {
-        if (b.getSize() != getSize())
+    Matrix operator+(const Matrix &m) const {
+        if (m.getSize() != size)
             throw std::invalid_argument("Matrices a and b must have the same dimensions");
-        size_t sum_size = getSize();
-        Matrix sum(sum_size);
-        for (size_t i = 0; i < sum_size; i++) {
-            for (size_t j = 0; j < sum_size; j++) {
-                sum.matrix[i * size + j] = matrix[i * size + j] + b.matrix[i * size + j];
+
+        Matrix sum(size);
+        for (size_t i = 0; i < size; i++) {
+            for (size_t j = 0; j < size; j++) {
+                sum[i][j] = (*this)[i][j] + m[i][j];
             }
         }
         return sum;
     }
 
-    Matrix operator-(const Matrix &b) {
-        if (b.getSize() != getSize())
+    Matrix operator-(const Matrix &m) const {
+        if (m.getSize() != getSize())
             throw std::invalid_argument("Matrices a and b must have the same dimensions");
-        size_t sum_size = getSize();
-        Matrix sum(sum_size);
-        for (size_t i = 0; i < sum_size; i++) {
-            for (size_t j = 0; j < sum_size; j++) {
-                sum.matrix[i * size + j] = matrix[i * size + j] - b.matrix[i * size + j];
+        Matrix sum(size);
+        for (size_t i = 0; i < size; i++) {
+            for (size_t j = 0; j < size; j++) {
+                sum[i][j] = (*this)[i][j] - m[i][j];
             }
         }
         return sum;
     }
 
-    Matrix operator*(const Matrix &b) {
-        if (b.getSize() != getSize())
+    Matrix operator*(const Matrix &m) const {
+        if (m.getSize() != size)
             throw std::invalid_argument("Matrices a and b must have the same dimensions");
-
-        size_t multi_size = getSize();
-        Matrix multi(multi_size);
-        for (size_t i = 0; i < multi_size; i++) {
-            for (size_t j = 0; j < multi_size; j++) {
-                multi.matrix[i * size + j] = 0;
-                for (size_t u = 0; u < multi_size; u++)
-                    multi.matrix[i * size + j] += matrix[i * size + u] * b.matrix[u * size + j];
+        Matrix multi(size);
+        for (size_t i = 0; i < size; i++) {
+            for (size_t j = 0; j < size; j++) {
+                multi[i][j] = 0;
+                for (size_t u = 0; u < size; u++)
+                    multi[i][j] += (*this)[i][u] * m[u][j];
             }
         }
         return multi;
@@ -198,7 +164,7 @@ public:
         Matrix trans(size);
         for (size_t i = 0; i < size; i++) {
             for (size_t j = 0; j < size; j++)
-                trans.matrix[i * size + j] = matrix[j * size + i];
+                trans[i][j] = (*this)[j][i];
         }
         return trans;
     }
@@ -211,38 +177,14 @@ public:
         Matrix negative(size);
         for (size_t i = 0; i < size; i++) {
             for (size_t j = 0; j < size; j++)
-                negative.matrix[i * size + j] = -matrix[i * size + j];
+                negative[i][j] = -(*this)[i][j];
         }
         return negative;
     }
 
-    friend std::ofstream &operator<<(std::ofstream &os, const Matrix &m) {
-        for (size_t i = 0; i < m.size; i++) {
-            for (size_t j = 0; j < m.size; j++) {
-                os << m.matrix[i * m.size + j];
-                if (j + 1 != m.size)
-                    os << " ";
-            }
-            os << "\n";
-        }
-        return os;
-    }
-
-    friend std::ifstream &operator>>(std::ifstream &os, const Matrix &m) {
-        for (size_t i = 0; i < m.size * m.size; i++) {
-            os >> m.matrix[i];
-        }
-        return os;
-    }
-
-
     friend std::ostream &operator<<(std::ostream &os, const Matrix &m) {
         for (size_t i = 0; i < m.size; i++) {
-            for (size_t j = 0; j < m.size; j++) {
-                os << m.matrix[i * m.size + j];
-                if (j + 1 != m.size)
-                    os << " ";
-            }
+            os << m[i];
             os << "\n";
         }
         return os;
@@ -259,14 +201,14 @@ public:
         return getMinor(row, column);
     }
 
-    MatrixRow operator[](size_t row) {
+    MatrixRow operator[](size_t row) const {
         if (size == 0 || size <= row)
             throw std::invalid_argument("Matrix has not valid dimension");
         return {size, row, matrix};
     }
 
 
-    MatrixColumn operator()(size_t column) {
+    MatrixColumn operator()(size_t column) const {
         if (size == 0 || size <= column)
             throw std::invalid_argument("Matrix has not valid dimension");
         return {size, column, matrix};
@@ -308,6 +250,7 @@ int main() {
 //    d(1)[0] =5;
 
     fout << d;
-//    fout << d(0,1);
+//    fout << d[0] << std::endl;
+//    std::cout << d(0);
     return 0;
 }
