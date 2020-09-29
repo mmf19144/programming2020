@@ -7,7 +7,6 @@ class column
 {
 	int ** matrix ;
 	const int dim;
-
 	const unsigned int column_idx;
 
 public:
