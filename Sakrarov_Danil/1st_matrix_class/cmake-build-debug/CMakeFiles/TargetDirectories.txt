@@ -1,0 +1,3 @@
+C:/Users/Danil/CLionProjects/matrix_class/cmake-build-debug/CMakeFiles/matrix_class.dir
+C:/Users/Danil/CLionProjects/matrix_class/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/Danil/CLionProjects/matrix_class/cmake-build-debug/CMakeFiles/rebuild_cache.dir
