@@ -19,7 +19,7 @@ public:
     Matrix() {}
 
     ~Matrix() {
-        delete data;
+        delete[] data;
     }
 
     Matrix(int num, bool singular = true) {
