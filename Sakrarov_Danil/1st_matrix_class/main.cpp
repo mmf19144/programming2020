@@ -1,16 +1,17 @@
 #include <iostream>
 #include <fstream>
-#include <assert.h>
-class Matrix_row{
+#include <cassert>
+#include <cstring>
+class Matrix_row {
 private:
-    size_t size;
+    const size_t size;
     const size_t row_index;
     int *matrix;
 
 public:
-    Matrix_row(const size_t row_):size(0), matrix(nullptr), row_index(row_){}
+    Matrix_row(const size_t row_) : size(0), matrix(nullptr), row_index(row_) {}
 
-    Matrix_row(size_t size_, const size_t row_, int *m):row_index(row_), size(size_), matrix(m){
+    Matrix_row(const size_t size_, const size_t row_, int *m) : row_index(row_), size(size_), matrix(m) {
     }
 
     int &operator[](size_t col) {
@@ -29,15 +30,17 @@ public:
 
 };
 
-class Matrix_col{
+class Matrix_col {
 private:
-    size_t size;
+    const size_t size;
     const size_t col_index;
     int *matrix;
 public:
-    Matrix_col(const size_t row_):size(0), matrix(nullptr), col_index(row_){}
-    Matrix_col(size_t size_,const size_t row_, int *m):col_index(row_), size(size_), matrix(m){
+    Matrix_col(const size_t row_) : size(0), matrix(nullptr), col_index(row_) {}
+
+    Matrix_col(const size_t size_, const size_t row_, int *m) : col_index(row_), size(size_), matrix(m) {
     }
+
     int &operator[](size_t row) {
         return matrix[row * size + col_index];
     }
@@ -55,7 +58,7 @@ public:
 
 class Matrix {
 private:
-    size_t size;
+    const size_t size;
     int *matrix;
 
 
@@ -77,30 +80,30 @@ public:
     }
 
     Matrix(const size_t size_) : size(size_), matrix(new int[size * size]) {
-        for (int i = 0; i < size; i ++) {
-            for (int j = 0; j < size; j ++){
-                if (i==j)
-                    matrix[i*size+i]=1;
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (i == j)
+                    matrix[i * size + i] = 1;
                 else
-                    matrix[i*size+j]=0;
+                    matrix[i * size + j] = 0;
             }
 
         }
     }
 
     Matrix(size_t size_, int element) : size(size_), matrix(new int[size * size]) {
-        for (int i = 0; i < size; i ++) {
-            for (int j = 0; j < size; j ++){
-                if (i==j)
-                    matrix[i*size+i]=element;
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (i == j)
+                    matrix[i * size + i] = element;
                 else
-                    matrix[i*size+j]=0;
+                    matrix[i * size + j] = 0;
             }
 
         }
     }
 
-     Matrix_row operator[](const size_t row)  {
+    Matrix_row operator[](const size_t row) {
         if (size == 0 || size <= row)
             throw std::invalid_argument("not valid argument for matrix");
         return {size, row, matrix};
@@ -118,35 +121,35 @@ public:
     }
 
     Matrix operator+(const Matrix &obj) {
-        assert(matrix!= nullptr);
-        assert(obj.matrix!= nullptr);
+        assert(matrix != nullptr);
+        assert(obj.matrix != nullptr);
         if (obj.size != size)
             throw std::invalid_argument("Matrix dimensions must agree");
         Matrix tmp(size);
 
-        for (int i = 0; i < size; i ++) {
-            for (int j=0;j<size;j++)
-            tmp[i][j] = (*this)[i][j] + obj[i][j];
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++)
+                tmp[i][j] = (*this)[i][j] + obj[i][j];
         }
         return tmp;
     }
 
     Matrix operator-(const Matrix &obj) {
-        assert(matrix!= nullptr);
-        assert(obj.matrix!= nullptr);
+        assert(matrix != nullptr);
+        assert(obj.matrix != nullptr);
         if (obj.size != size)
             throw std::invalid_argument("Matrix dimensions must agree");
         Matrix tmp(size);
-        for (int i = 0; i < size; i ++) {
-            for (int j=0;j<size;j++)
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++)
                 tmp[i][j] = (*this)[i][j] - obj[i][j];
         }
         return tmp;
     }
 
     Matrix operator*(const Matrix &obj) {
-        assert(matrix!= nullptr);
-        assert(obj.matrix!= nullptr);
+        assert(matrix != nullptr);
+        assert(obj.matrix != nullptr);
         if (obj.size != size)
             throw std::invalid_argument("Matrix dimensions must agree");
         Matrix tmp(size);
@@ -163,39 +166,19 @@ public:
     }
 
     bool operator==(const Matrix &obj) {
-        assert(matrix!=nullptr);
-        assert(obj.matrix!=nullptr);
+        assert(matrix != nullptr);
+        assert(obj.matrix != nullptr);
         if (obj.size != size)
             throw std::invalid_argument("Matrix dimensions must agree");
-
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                if ((*this)[i][j]!=obj[i][j])
-                    return false;
-            }
-        }
-        return true;
+        return memcmp(matrix, obj.matrix, size * size * sizeof(int));
     }
+
     friend bool operator!=(Matrix &obj1, Matrix &obj2) {
         return !(obj1 == obj2);
-        /*
-         * не знаю есть ли смысл здесь копипастить ==, если нет, то удалю это
-         * assert(obj1.matrix!=nullptr);
-        assert(obj2.matrix!=nullptr);
-        if (obj1.size != obj2.size)
-            throw std::invalid_argument("Matrix dimensions must agree");
-
-        for (int i = 0; i < obj1.size; i++) {
-            for (int j = 0; j < obj1.size; j++) {
-                if (obj1.matrix[i*obj1.size+j]!=obj2.matrix[i*obj2.size+j])
-                    return true;
-            }
-        }
-        return false;*/
     }
 
     Matrix operator!() {
-        assert(matrix!=nullptr);
+        assert(matrix != nullptr);
         Matrix tmp(size);
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
@@ -205,7 +188,7 @@ public:
         return tmp;
     }
 
-    Matrix operator()(int row, int column) {
+    Matrix operator()(const size_t row, const size_t column) {
         Matrix tmp(size - 1);
         int was_i = 0;
         int was_j = 0;
@@ -219,23 +202,10 @@ public:
                     was_j = 1;
                     continue;
                 }
-                tmp[i-was_i][j-was_j] = (*this)[i][j];
+                tmp[i - was_i][j - was_j] = (*this)[i][j];
             }
         }
         return tmp;
-    }
-
-    friend std::ofstream &operator<<(std::ofstream &os, const Matrix &obj) {
-        for (int i = 0; i < obj.size; i++) {
-            for (int j = 0; j < obj.size; j++) {
-                os << obj.matrix[i * obj.size + j];
-                if (j + 1 != obj.size) {
-                    os << ' ';
-                }
-            }
-            os << std::endl;
-        }
-        return os;
     }
 
     friend std::ostream &operator<<(std::ostream &os, const Matrix &obj) {
@@ -251,7 +221,7 @@ public:
         return os;
     }
 
-    friend std::ifstream &operator>>(std::ifstream &os, Matrix &obj) {
+    friend std::istream &operator>>(std::istream &os, Matrix &obj) {
         for (int i = 0; i < obj.size; i++) {
             for (int j = 0; j < obj.size; j++) {
                 os >> obj[i][j];
@@ -268,7 +238,7 @@ int main() {
     std::ofstream fout("output.txt");
     int size, k_matr;
     fin >> size >> k_matr;
-    Matrix a(size), b(size), c(size), k(size,k_matr), d(size);
+    Matrix a(size), b(size), c(size), k(size, k_matr), d(size);
 
     fin >> a >> b >> c >> d;
     Matrix p = (a + (b * (!c)) + k) * (!d);
