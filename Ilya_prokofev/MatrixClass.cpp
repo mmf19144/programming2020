@@ -14,6 +14,10 @@ public:
 
 	int& operator[](const size_t row)//column element reference
 	{
+		if (row > dim) 
+		{
+			throw invalid_argument("Row index is greater than dimension");
+		}
 		return matrix[dim * (row-1) + column_idx - 1];
 	}
 };
@@ -27,8 +31,12 @@ class row
 public:
 	row(const size_t dim, int* m, const size_t _raw_id) : matrix(m), dim(dim), row_idx(_raw_id) {}
 
-	int& operator[](const size_t column)//raw element reference
+	int& operator[](const size_t column)//row element reference
 	{
+		if (column > dim)
+		{
+			throw invalid_argument("Column index is greater than dimension");
+		}
 		return matrix[dim * (column-1) + row_idx - 1];
 	}
 	ostream& operator << (ostream& os) {
@@ -108,17 +116,14 @@ public:
 	{
 		if (this->dim != that.dim)
 		{
-			throw "wrong dimention";
+			throw invalid_argument("wrong dimention");
 		}
 		int n1 = this->dim;
 		Matrix temp(n1);
 
-		for (size_t i = 0; i < n1; i++)
+		for (size_t i = 0; i < n1*n1; i++)
 		{
-			for (size_t j = 0; j < n1; j++)
-			{
-				temp[i][j] = (*this)[i][j] + that[i][j];
-			}
+			temp.data[i] = this -> data[i] + that.data[i];
 		}
 		return temp;
 	}
@@ -141,17 +146,13 @@ public:
 	{
 		if (this->dim != that.dim)
 		{
-			throw "wrong dimention";
+			throw invalid_argument("wrong dimention");
 		}
 		size_t n1 = this->dim;
 		Matrix temp(n1);
-
 		for (size_t i = 0; i < n1; i++)
 		{
-			for (size_t j = 0; j < n1; j++)
-			{
-				temp[i][j] = (*this)[i][j] - that[i][j];
-			}
+				temp.data[i] = this -> data[i] - that.data[i];
 		}
 		return temp;
 	}
@@ -159,7 +160,7 @@ public:
 	{
 		if (this->dim != that.dim)
 		{
-			throw "wrong dimention";
+			throw invalid_argument("wrong dimention");
 		}
 		size_t n1 = this->dim;
 		Matrix temp(n1);
@@ -184,12 +185,9 @@ public:
 		}
 		for (size_t i = 0; i < dim; i++)
 		{
-			for (size_t j = 0; j < dim; j++)
+			if (this -> data[i] != that.data[i])
 			{
-				if ((*this)[i][j] != that[i][j])
-				{
-					return false;
-				}
+				return false;
 			}
 		}
 		return true;
@@ -214,11 +212,11 @@ public:
 	{
 		if (raw > dim)
 		{
-			throw "raw is  greater than dim";
+			throw invalid_argument("row index is greater than dim");
 		}
 		if (column > dim)
 		{
-			throw "column is  greater than dim";
+			throw invalid_argument("column index is greater than dim");
 		}
 		Matrix res(this -> dim-1);
 		for (size_t i = 0; i < raw-1; i++)
@@ -255,7 +253,7 @@ public:
 	{
 		if (index > dim)
 		{
-			throw "raw is  greater than dim";
+			throw invalid_argument("raw is  greater than dim");
 		}
 		return { dim, data, index};
 	}
@@ -264,7 +262,7 @@ public:
 	{
 		if (index > dim)
 		{
-			throw "column is  greater than dim";
+			throw invalid_argument("column is  greater than dim");
 		}
 
 		return { dim, data, index};
@@ -306,6 +304,7 @@ int main()
 	//((A + (B * (!C)) + K) * (!D)).print(output);
 	//A += B;
 	//A.print();
+	A[1][1] -= 8;
 	A(2)[2] += 5;
 	output << A;
 	output.close();
