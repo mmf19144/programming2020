@@ -170,7 +170,7 @@ public:
         assert(obj.matrix != nullptr);
         if (obj.size != size)
             throw std::invalid_argument("Matrix dimensions must agree");
-        return memcmp(matrix, obj.matrix, size * size * sizeof(int));
+        return !memcmp(matrix, obj.matrix, size * size * sizeof(int));
     }
 
     friend bool operator!=(Matrix &obj1, Matrix &obj2) {
@@ -239,9 +239,11 @@ int main() {
     int size, k_matr;
     fin >> size >> k_matr;
     Matrix a(size), b(size), c(size), k(size, k_matr), d(size);
-
+    Matrix i(size, 1);
+    Matrix j(size, 1);
     fin >> a >> b >> c >> d;
     Matrix p = (a + (b * (!c)) + k) * (!d);
     fout << (a + b * (!c) + k) * (!d);
+
     return 0;
 }
