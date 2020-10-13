@@ -39,9 +39,9 @@ public:
 		}
 		return matrix[dim * (column-1) + row_idx - 1];
 	}
-	ostream& operator << (ostream& os) {
-		for (size_t i = 0; i < dim; i++) {
-			os << matrix[row_idx * dim + i];
+	friend ostream& operator<< (ostream& os, const row &m) {
+		for (size_t i = 0; i < m.dim; i++) {
+			os << m.matrix[m.row_idx * m.dim + i];
 			os << " ";
 		}
 		return os;
@@ -52,7 +52,7 @@ class Matrix
 {
 	int* data; //matrix
 	size_t dim; //dimension
-	int* allocate_matrix (int n) // memory allocation
+	static int* allocate_matrix (int n) // memory allocation
 	{
 		int* L = new int [n*n];
 		for (size_t i = 0; i < n * n; i++) {
@@ -95,7 +95,10 @@ public:
 			this -> data[i] = that.data[i];
 		}
 	}
-
+	void clear_matrix()
+	{
+		delete[] data;
+	}
 	int dimension()
 	{
 		return this->dim;
@@ -103,7 +106,7 @@ public:
 
 	Matrix& operator=(const Matrix& that)
 	{
-		this->~Matrix();
+		this->clear_matrix();
 		this->dim = that.dim;
 		this->data = allocate_matrix(dim);
 		for (size_t i = 0; i < dim; i++)
@@ -270,7 +273,7 @@ public:
 
 	friend ostream& operator<<(ostream& os, const Matrix& m) {
 			for (size_t i = 0; i < m.dim; i++) {
-				m[i] << os;
+				os << m[i];
 				os << "\n";
 			}
 		return os;
@@ -285,7 +288,7 @@ public:
 
 	~Matrix()
 	{
-		delete[] data;
+		this->clear_matrix();
 	}
 };
 
