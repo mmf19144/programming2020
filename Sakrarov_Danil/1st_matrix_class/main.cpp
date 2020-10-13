@@ -239,8 +239,6 @@ int main() {
     int size, k_matr;
     fin >> size >> k_matr;
     Matrix a(size), b(size), c(size), k(size, k_matr), d(size);
-    Matrix i(size, 1);
-    Matrix j(size, 1);
     fin >> a >> b >> c >> d;
     Matrix p = (a + (b * (!c)) + k) * (!d);
     fout << (a + b * (!c) + k) * (!d);
