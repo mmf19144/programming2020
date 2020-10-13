@@ -107,6 +107,7 @@ public:
 	Matrix& operator=(const Matrix& that)
 	{
 		this->clear_matrix();
+		this->data = nullptr;
 		this->dim = that.dim;
 		this->data = allocate_matrix(dim);
 		for (size_t i = 0; i < dim; i++)
