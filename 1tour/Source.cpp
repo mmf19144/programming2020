@@ -1,0 +1,173 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <iostream>
+#include <fstream>
+using namespace std;
+
+class matrix {
+private:
+	int dim;//dimention of matrix
+	int** array;
+
+public:
+	
+	matrix() {
+		dim = 0;
+		array = 0;
+	}
+	//identity matrix
+	matrix(int N) {
+		dim = N;
+		if (N >= 0) {
+			array = new int* [N];
+			for (int i = 0; i < N; i++)
+				array[i] = new int[N];
+			for (int i = 0; i < N; i++) {
+				for (int j = 0; j < N; j++) {
+					if (i == j) array[i][j] = 1;
+					else array[i][j] = 0;
+				}
+			}
+		}
+		//else throw std::invalid_argument("Not valid dimension");
+	}
+	//diagonal matrix
+	matrix(int N, int* data) {
+		dim = N;
+		if (N >= 0) {
+			array = new int* [N];
+			for (int i = 0; i < N; i++)
+				array[i] = new int[N];
+			for (int i = 0; i < N; i++) {
+				for (int j = 0; j < N; j++) {
+					if (i == j) array[i][j] = data[i];
+					else array[i][j] = 0;
+				}
+			}
+		}
+		//else throw std::invalid_argument("Not valid dimension");
+	}
+	//
+	matrix(const matrix& X) {
+		dim = X.dim;
+		array = new int* [X.dim];
+		for (int i = 0; i < X.dim; i++)
+			array[i] = new int[X.dim];
+		for (int i = 0; i < X.dim; i++)
+			for (int j = 0; j < X.dim; j++)
+				array[i][j] = X.array[i][j];
+	}
+	//destructor
+	~matrix() { 
+		for (int i = 0; i < dim; i++){
+			delete[] array[i];
+		}
+		delete[] array; 
+	}
+
+	matrix operator+(const matrix& X) {
+		if (dim == X.dim) {
+			matrix temp(dim);
+			for (int i = 0; i < dim; i++)
+				for (int j = 0; j < dim; j++) {
+					temp.array[i][j] = array[i][j] + X.array[i][j];
+				}
+			return temp;
+		}
+		//else throw std::logic_error{ "Matrix::operator+" };
+	}
+
+	matrix operator-(const matrix& X) {
+		if (dim == X.dim) {
+			matrix temp(dim);
+			for (int i = 0; i < dim; i++)
+				for (int j = 0; j < dim; j++) {
+					temp.array[i][j] = array[i][j] - X.array[i][j];
+				}
+			return temp;
+		}
+		//else throw std::logic_error{ "Matrix::operator-" };
+	}
+
+	matrix operator*(const matrix& X) {
+		if (dim == X.dim) {
+			matrix temp(dim);
+			for (int i = 0; i < dim; i++) {
+				for (int j = 0; j < dim; j++) {
+					temp.array[i][j] = 0;
+					for (int k = 0; k < dim; k++)
+						temp.array[i][j] += array[i][k] * X.array[k][j];
+				}
+			}
+			return temp;
+		}
+		//else throw std::logic_error{ "Matrix::operator*" };
+	}
+
+	matrix T() {
+		matrix temp(dim);
+		for (size_t i = 0; i < dim; i++) {
+			for (size_t j = 0; j < dim; j++)
+				temp.array[i][j] = array[j][i];
+		}
+		return temp;
+	}
+
+	matrix operator!() {
+		return T();
+	}
+
+	matrix operator==(const matrix& X){
+		if (dim != X.dim)
+			return false;
+		for (int i = 0; i < dim; i++)
+			for (int j = 0; j < dim; j++)
+				if (!(array[i][j] == X.array[i][j]))
+					return false;
+		return true;
+	}
+
+	friend std::ostream& operator<<(std::ostream& out, const matrix& X) {
+		for (int i = 0; i < X.dim; i++) {
+			for (int j = 0; j < X.dim; j++) {
+				out << X.array[i][j];
+				out << " ";
+			}
+			out << "\n";
+		}
+		return out;
+	}
+
+	friend std::istream& operator>>(std::istream& in, matrix& X){
+		for (int i = 0; i < X.dim; i++){
+			for (int j = 0; j < X.dim; j++){
+				in >> X.array[i][j];
+			}
+		}
+		return in;
+	}
+};
+
+
+int main() {
+	std::ifstream fin("input.txt");
+	std::ofstream fout("output.txt");
+
+	int N = 0;//dimention of matrix
+	int k = 0;//dioganal elements
+
+	fin >> N >> k;
+
+	int* diag = new int[N];
+	for (int i = 0; i < N; i++)
+		diag[i] = k;
+	matrix K(N, diag);
+
+	matrix A(N), B(N), C(N), D(N);
+
+	fin >> A >> B >> C >> D;
+
+	matrix result = ((A + B * C.T() + K) * D.T());
+
+	fout << result;
+	return 0;
+}
