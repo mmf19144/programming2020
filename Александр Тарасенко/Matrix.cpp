@@ -173,12 +173,11 @@ int main() {
 
 	Matrix A(N), B(N), C(N), K(N, k), D(N);
 
-	fin >> A;
-//>> B >> C >> D;
+	fin >> A >> B >> C >> D;
 
-	//fout << (A + B * (~C) + K) * (~D);
+	fout << (A + B * (~C) + K) * (~D);
 
-	fout << A(2, 1);
+	//fout << A(2, 1);
 
 	return 0;
 }
