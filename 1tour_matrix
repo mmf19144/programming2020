@@ -1,0 +1,325 @@
+#define CRT_SECURE_NO_WARNINGS
+
+#include <iostream>
+#include <fstream>
+#include <cstring> //Использование memcmp
+
+class m_column {
+
+private:
+    const size_t sizem;
+    const size_t col_id;
+    int* M;
+
+public:
+
+    m_column(const size_t idx) : sizem(0), M(nullptr), col_id(idx) {}
+
+    m_column(const size_t size_matrix, const size_t idx, int* m) : col_id(idx), sizem(size_matrix), M(m) {}
+
+    int& operator[](size_t column) {
+
+        if (column > this->sizem)
+        {
+            throw "Error, col id is bigger then size of matrix";
+        }
+
+        return M[column * sizem + col_id];
+
+    }
+
+    friend std::ostream& operator<<(std::ostream& stream, const m_column& m) {
+
+        for (size_t i = 0; i < m.sizem; i++) {
+
+            stream << m.M[i * m.sizem + m.col_id];
+            if (i + 1 != m.sizem)
+                stream << " ";
+
+        }
+        return stream;
+    }
+
+};
+
+class m_row {
+
+private:
+    const size_t sizem;
+    const size_t row_id;
+    int* M;
+
+public:
+
+    m_row(const size_t idx) : sizem(0), M(nullptr), row_id(idx) {}
+
+    m_row(const size_t size_matrix, const size_t idx, int* m) : row_id(idx), sizem(size_matrix), M(m) {}
+
+    int& operator[](size_t row) {
+
+        if (row > sizem)
+        {
+            throw "Error, row id is bigger then size of matrix";
+        }
+
+        return M[row_id * sizem + row];
+
+    }
+
+
+    friend std::ostream& operator<<(std::ostream& stream, const m_row& m) {
+
+        for (size_t i = 0; i < m.sizem; i++) {
+
+            stream << m.M[m.row_id * m.sizem + i];
+            if (i + 1 != m.sizem)
+                stream << " ";
+
+        }
+        return stream;
+    }
+
+};
+
+class Matrix {
+
+private:
+    const size_t sizem; //размерность матрицы
+    int* minfo; //собственно матрица
+    
+    m_column operator()(const size_t column) const {
+
+        if (sizem <= column) {
+
+            throw std::invalid_argument("Matrix wrong value");
+
+        }
+        return { sizem, column, minfo };
+    }
+
+    m_row operator[](const size_t row) const {
+
+        if (sizem <= row) {
+
+         throw std::invalid_argument("Matrix wrong value");
+
+        } 
+        return { sizem, row, minfo };
+    }
+
+
+public:
+
+    Matrix() : sizem(0), minfo(nullptr) {} //инициализация матрицы размерности 0
+
+    Matrix(size_t size_matrix, int el) : sizem(size_matrix), minfo(new int[sizem * sizem]) { //Диагональная с числом el на главной диагонали
+        for (int i = 0; i < sizem; i++) {
+
+            for (int j = 0; j < sizem; j++) {
+
+                if (i == j) {
+                
+                    minfo[i * sizem + i] = el;
+                }
+                else
+                    minfo[i * sizem + j] = 0;
+
+            }
+
+        }
+    }
+
+    Matrix(const size_t size_matrix) : sizem(size_matrix), minfo(new int[sizem * sizem]) { //инициализация единичной матрицы
+
+        for (int i = 0; i < sizem; i++) {
+
+            for (int j = 0; j < sizem; j++) {
+                if (i == j) {
+
+                    minfo[i * sizem + i] = 1;
+
+                }
+                else
+                    minfo[i * sizem + j] = 0;
+            }
+
+        }
+    }
+
+    size_t getSize() const {
+        return sizem;
+    }
+
+    //Matrix(const Matrix& b) : sizem(b.sizem) //копирование
+    //{
+    //    
+    //    for (size_t i = 0; i < sizem * sizem; i++)
+    //    {
+    //        this->minfo[i] = b.minfo[i];
+    //    }
+    //}
+
+    Matrix operator+(const Matrix& b) { //Суммирование
+
+        if (b.getSize() != getSize()) {
+
+            throw std::invalid_argument("Error, sizes of matrices are different");
+        }
+
+        Matrix sum(sizem);
+
+        for (int i = 0; i < sizem; i++) {
+            for (int j = 0; j < sizem; j++)
+                sum[i][j] = (*this)[i][j] + b[i][j];
+        }
+        return sum;
+    }
+
+    Matrix operator-(const Matrix& b) { //Разность
+
+        if (b.getSize() != getSize()) {
+
+            throw std::invalid_argument("Error, sizes of matrices are different");
+
+        }
+
+        Matrix neg(sizem);
+
+        for (int i = 0; i < sizem; i++) {
+            for (int j = 0; j < sizem; j++)
+                neg[i][j] = (*this)[i][j] - b[i][j];
+        }
+        return neg;
+    }
+
+    Matrix operator!() { //Транспонирование
+
+        Matrix trans(sizem);
+
+        for (int i = 0; i < sizem; i++) {
+            for (int j = 0; j < sizem; j++) {
+                trans[i][j] = (*this)[j][i];
+            }
+        }
+        return trans;
+    }
+
+    Matrix operator*(const Matrix& b) { //Умножение
+
+        if (b.getSize() != getSize()) {
+
+            throw std::invalid_argument("Error, sizes of matrices are different");
+        }
+
+        Matrix multi(sizem);
+
+        for (int i = 0; i < sizem; i++) {
+
+            for (int j = 0; j < sizem; j++) {
+                multi.minfo[i * sizem + j] = 0;
+
+                for (int k = 0; k < sizem; k++) {
+                    multi[i][j] += (*this)[i][k] * b[k][j];
+                }
+            }
+        }
+        return multi;
+    }
+
+    Matrix operator()(const size_t row, const size_t column) {
+
+        Matrix minor(sizem - 1);
+
+        int up_row = 0;
+        int up_column = 0;
+
+        for (int i = 0; i < sizem; i++) {
+
+            if (i == row) {
+
+                up_row = 1;
+                continue;
+
+            }
+            for (int j = 0; j < sizem; j++) {
+
+                if (j == column) {
+
+                    up_column = 1;
+                    continue;
+
+                }
+
+                minor[i - up_row][j - up_column] = (*this)[i][j];
+            }
+        }
+        return minor;
+    }
+
+    bool operator==(const Matrix& b) { //сравнение
+
+        if (b.getSize() != getSize()) {
+
+            throw std::invalid_argument("Error, sizes of matrices are different");
+
+        }
+        return !memcmp(minfo, b.minfo, sizem * sizem * sizeof(int));
+    }
+
+    bool operator!=(Matrix& b) {
+        return !(*this == b);
+    }
+
+    ~Matrix() {  //Деструктор
+        delete[] minfo;
+    }
+
+    friend std::ostream& operator<<(std::ostream& stream, const Matrix& b) {
+        for (int i = 0; i < b.sizem; i++) {
+            for (int j = 0; j < b.sizem; j++) {
+                stream << b.minfo[i * b.sizem + j];
+                if (j + 1 != b.sizem) {
+                    stream << ' ';
+                }
+            }
+            stream << std::endl;
+        }
+        return stream;
+    }
+
+    friend std::istream& operator>>(std::istream& stream, Matrix& b) {
+        for (int i = 0; i < b.sizem; i++) {
+            for (int j = 0; j < b.sizem; j++) {
+                stream >> b[i][j];
+            }
+        }
+        return stream;
+    }
+
+};
+
+int main() {
+
+    std::ifstream input("input.txt");
+    std::ofstream output("output.txt");
+
+    size_t n;
+    int k;
+
+    input >> n >> k;
+
+    Matrix A(n);
+    Matrix B(n);
+    Matrix C(n);
+    Matrix K(n, k);
+    Matrix D(n);
+
+    input >> A >> B >> C >> D;
+
+    output << (A + B * (!C) + k) * (!D);
+
+    input.close();
+    output.close();
+
+    return 0;
+}
