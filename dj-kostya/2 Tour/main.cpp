@@ -202,7 +202,24 @@ public:
         y += sim.get_height();
         y %= sim.get_height();
         if ((sim.get_current_step() - birth_step) > 0 && (sim.get_current_step() - birth_step) % constancy == 0) {
-            ++rot;
+            switch (rot) {
+                case MovRotation::UP:{
+                    rot = MovRotation::RIGHT;
+                    break;
+                }
+                case MovRotation::RIGHT:{
+                    rot = MovRotation::DOWN;
+                    break;
+                }
+                case MovRotation::DOWN:{
+                    rot = MovRotation::LEFT;
+                    break;
+                }
+                case MovRotation::LEFT:{
+                    rot = MovRotation::UP;
+                    break;
+                }
+            }
         }
         return get_pos();
     }
@@ -409,7 +426,8 @@ int main() {
     Simulation test(H, W, steps);
     fin >> test;
     test.run();
-    fout << test;
+    fout << test<< std::endl;
+
 
     return 0;
 }
