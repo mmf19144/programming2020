@@ -1,0 +1,388 @@
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <stack>
+#include <vector>
+
+using namespace std;
+
+
+class Expression 
+{
+public:
+	Expression() {}
+	virtual ostream& print(ostream& out) = 0;
+	virtual Expression* derivative(string var) = 0;
+	virtual double eval (string eval) = 0;
+
+};
+class Number : public Expression 
+{
+	double val;
+	friend Expression* build(string exp);
+public:
+	Number(double val) : val(val){}
+	virtual ostream& print(ostream& out) {
+		out << val;
+		return out;
+	}
+	virtual Expression* derivative(string var) 
+	{
+		return new Number(0);
+	}
+	virtual double eval(string eval) {
+		return val;
+	}
+};
+class Variable : public Expression 
+{
+	string var;
+	friend Expression* build(string exp);
+public:
+	Variable(string var) : var(var){}
+	virtual ostream& print(ostream& out) {
+		out << var;
+		return out;
+	}
+	virtual Expression* derivative(string var)
+	{
+		if (var == this->var) {
+			return new Number(1);
+		}
+		return new Number(0);
+	}
+	virtual double eval(string eval) {
+		size_t i = eval.find(this -> var + " <- ");
+		if (i == string::npos) {
+			throw invalid_argument("incorrect eval");
+		}
+		string x = "";
+		size_t delimeter = eval.find(";", i + 1);
+		if (delimeter = string::npos) {
+			delimeter = eval.length();
+		}
+		i += 4 + this-> var.length();
+		x = eval.substr(i, delimeter - i);
+		double res = stod(x);
+		return res;
+	}
+};
+class Add : public Expression 
+{
+	Expression* left;
+	Expression* right;
+	Add(Expression* left, Expression* right) : left(left), right(right){}
+	friend class Mul;
+	friend class Div;
+	friend Expression* build(string exp);
+public:
+	virtual ostream& print(ostream& out) 
+	{
+		out << "(";
+		left->print(out);
+		out << "+";
+		right->print(out);
+		out << ")";
+		return out;
+	}
+	virtual Expression* derivative(string var)
+	{
+		return new Add(left->derivative(var), right->derivative(var));
+	}
+	~Add()
+	{
+		delete left;
+		delete right;
+	}
+	virtual double eval(string eval)
+	{
+		return left -> eval(eval) + right -> eval(eval);
+	}
+};
+class Sub : public Expression
+{
+	Expression* left;
+	Expression* right;
+	Sub(Expression* left, Expression* right) : left(left), right(right) {}
+	friend class Div;
+	friend Expression* build(string exp);
+public:
+	virtual ostream& print(ostream& out)
+	{
+		out << "(";
+		left->print(out);
+		out << "-";
+		right->print(out);
+		out << ")";
+		return out;
+	}
+	~Sub()
+	{
+		delete left;
+		delete right;
+	}
+	virtual Expression* derivative(string var)
+	{
+		return new Sub(left->derivative(var), right->derivative(var));
+	}
+	virtual double eval(string eval)
+	{
+		return left->eval(eval) - right->eval(eval);
+	}
+};
+class Mul : public Expression
+{
+	Expression* left;
+	Expression* right;
+	Mul(Expression* left, Expression* right) : left(left), right(right) {}
+	friend class Div;
+	friend Expression* build(string exp);
+public:
+	virtual ostream& print(ostream& out)
+	{
+		out << "(";
+		left->print(out);
+		out << "*";
+		right->print(out);
+		out << ")";
+		return out;
+	}
+	virtual Expression* derivative(string var)
+	{
+		return new Add(new Mul(left->derivative(var),right), new Mul(left, right->derivative(var)));
+	}
+	~Mul()
+	{
+		delete left;
+		delete right;
+	}
+	virtual double eval(string eval)
+	{
+		return left->eval(eval) * right->eval(eval);
+	}
+};
+class Div : public Expression 
+{
+	Expression* numerator;
+	Expression* denominator;
+	Div(Expression* left, Expression* right) : numerator(left), denominator(right) {}
+	friend Expression* build(string exp);
+public:
+	virtual ostream& print(ostream& out)
+	{
+		out << "(";
+		numerator->print(out);
+		out << "/";
+		denominator->print(out);
+		out << ")";
+		return out;
+	}
+	virtual Expression* derivative(string var)
+	{
+		return new Div(new Sub(new Mul(numerator->derivative(var),denominator), new Mul(denominator->derivative(var),numerator)), new Mul (denominator, denominator));
+	}
+	~Div()
+	{
+		delete numerator;
+		delete denominator;
+	}
+	virtual double eval(string eval)
+	{
+		return numerator -> eval(eval) / denominator -> eval(eval);
+	}
+};
+Expression* build(string exp) {
+	if (exp.find('(') == string::npos)
+	{
+		try {
+			return new Number(stod(exp));
+		}
+		catch (invalid_argument) {
+			return new Variable(exp);
+		}
+	}
+	exp = exp.substr(1, exp.length() - 2);
+	int cnt = 0;
+	size_t i = 0;
+	while (true)
+	{
+		if (exp[i] == '(')
+		{
+			cnt++;
+		}
+		if (exp[i] == ')')
+		{
+			cnt--;
+		}
+		if (cnt == 0 && (exp[i] == '+' || exp[i] == '*' || exp[i] == '/' || exp[i] == '-')) {
+			break;
+		}
+		i++;
+	}
+	string left = exp.substr(0, i);
+	string right = exp.substr(i + 1, exp.length() - i - 1);
+	if (exp[i] == '+')
+	{
+		return new Add(build(left), build(right));
+	}
+	if (exp[i] == '*')
+	{
+		return new Mul(build(left), build(right));
+	}
+	if (exp[i] == '/')
+	{
+		return new Div(build(left), build(right));
+	}
+	return new Sub(build(left), build(right));
+}
+
+int priority(string simbol)
+{
+	if (simbol == "(")
+		return 1;
+	if (simbol == ")")
+		return 2;
+	if (simbol == "-" || simbol == "+")
+		return 3;
+	if (simbol == "/" || simbol == "*")
+		return 4;
+	return 5;
+}
+
+vector <string> split(string exp)
+{
+	string x;
+	vector <string> res;
+	for (size_t i = 0; i < exp.length(); i++)
+	{
+		x = "";
+		if (isalpha(exp[i]))
+		{
+			x += exp[i];
+			size_t j = 1;
+			while (isalpha(exp[i + j])) {
+				x += exp[i + j];
+				j++;
+			}
+			res.push_back(x);
+			i += j;
+		}
+		x = "";
+		if (isdigit(exp[i]))
+		{
+			x += exp[i];
+			size_t j = 1;
+			while (isdigit(exp[i + j])) {
+				x += exp[i + j];
+				j++;
+			}
+			res.push_back(x);
+			i += j ;
+		}
+		x = "";
+		if (exp[i] == ')' || exp[i] == '(' || exp[i] == '+' || exp[i] == '-' || exp[i] == '*' || exp[i] == '/')
+		{
+			x = string(1, exp[i]);
+			res.push_back(x);
+		}
+		x = "";
+	}
+	return res;
+}
+
+vector <string> RPN(vector <string> exp )
+{
+	stack <string> stack;
+	string x;
+	vector <string> res;
+	for (size_t i = 0; i < exp.size(); i++)
+	{
+		x = exp[i];
+		
+		if (x == "(") 
+		{
+			stack.push(x);
+			continue;
+		}
+		if (isalpha(x[0]))
+		{
+
+			res.push_back(x);
+			continue;
+		}
+		if (x == ")")
+		{
+			while (stack.top() != "(")
+			{
+				res.push_back(stack.top());
+				stack.pop();
+			}
+			stack.pop();
+			continue;
+		}
+		if (stack.empty())  //пустой
+		{
+			stack.push(x);
+		}
+		else
+		{
+			while (!stack.empty() && (priority(stack.top()) >= priority(x)))
+			{
+				res.push_back(stack.top());
+				stack.pop();
+			}
+			stack.push(x);
+		}
+	}
+	while (!stack.empty())
+	{
+		res.push_back(stack.top());
+		stack.pop();
+	}
+	return res;
+}
+
+string build_RPN(vector <string> exp)
+{
+	string res;
+	size_t i = 0;
+	while (exp.size() != 1)
+	{
+		if (exp[i] != "+" && exp[i] != "*" && exp[i] != "-" && exp[i] != "/") 
+		{
+			i++;
+			continue;
+		}
+		exp[i] = "(" + exp[i - 2] + exp[i] + exp[i - 1] + ")";
+		exp.erase(exp.begin() + i - 1);
+		exp.erase(exp.begin() + i - 2);
+		i = 0;
+	}
+	return exp[0];
+}
+
+Expression* build_expression(string exp)
+{
+	vector <string> exp_tokens = split(exp);
+	vector <string> exp_tokens_RPN = RPN(exp_tokens);
+	string expression_with_brackets = build_RPN(exp_tokens_RPN);
+	Expression* res = build(expression_with_brackets);
+	return res;
+}
+
+
+int main() 
+{
+	ifstream in("input.txt");
+	string expression;
+	in >> expression;
+	Expression* exp = build_expression(expression);
+	Expression* res = exp->derivative("x");
+	in.close();
+	ofstream out("output.txt");
+	res->print(out);
+	out.close();
+	cout<<exp->eval("x <- 4; y <- 5; xy <- 8");
+	return 0;
+}
+
