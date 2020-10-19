@@ -1,8 +1,8 @@
-#define CRT_SECURE_NO_WARNINGS
+
 #include <iostream>
 #include <fstream>
-#include <cstdio>
-#include <stdio.h>
+
+
 using namespace std;
 
 
@@ -12,14 +12,11 @@ class Matrix {
 
 public:
 
-    friend void readMatrix(std::ifstream &is, Matrix &m);
-
-    friend void writeMatrix(std::ofstream &os, Matrix &m);
 
 
-    Matrix() {
-        this->dim = 0;
-        this->data = nullptr;
+
+    Matrix():
+        dim(0), data(nullptr){
     }
     ~Matrix() {
         delete[] data;
@@ -33,11 +30,13 @@ public:
 
         for (int i = 0; i < num; i++) {
             for (int j = 0; j < num; j++) {
-                if (singular) if (i == j) { this->data[i * num + i] = 1; }
+                if (singular) {
+                    if (i == j) { this->data[i * num + i] = 1; }
+                }
                 this->data[i * num + j] = 0;
             }
         }
-        //for (int i = 0; i < num; i++) { this->data[i][i] = 1; }
+
     }
 
     Matrix(int num, int const *arr) {
@@ -128,11 +127,11 @@ public:
         Matrix result((this->dim) - 1, false);
         int minor_row, minor_col;
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < this-> dim; i++) {
             minor_row = i;
             if (i > r)
                 minor_row--;
-            for (int j = 0; j < 3; j++) {
+            for (int j = 0; j < this->dim; j++) {
                 minor_col = j;
                 if (j > c)
                     minor_col--;
@@ -143,38 +142,46 @@ public:
         return result;
     }
 
-    int *operator()(int col) {
-        int *result = new int[this->dim];
-        for (int n = 0; n < this->dim; n++) result[n] = this->data[n * this->dim + col];
-        return result;
+    void readMatrix(std::ifstream &is, Matrix &m) {
+        for (int i = 0; i < m.dim; i++) {
+            for (int j = 0; j < m.dim; j++) {
+                is >> m.data[i * m.dim + j];
+            }
+        }
     }
 
-    int *operator[](int row) {
-        int *result = new int[this->dim];
-        for (int n = 0; n < this->dim; n++) result[n] = this->data[row * this->dim + n];
-        return result;
+    void writeMatrix(std::ofstream &os, Matrix &m) {
+        for (int i = 0; i < m.dim; i++) {
+            for (int j = 0; j < m.dim; j++) {
+                os << m.data[i * m.dim + j]<< " " ;
+            }
+            os << endl;
+        }
+    }
+    friend std::ostream& operator<< (std::ostream &out, Matrix& m) {
+
+        for (int i = 0; i < m.dim; i++) {
+            for (int j = 0; j < m.dim; j++)
+                out << m.data[i*m.dim + j] << " ";
+            out << std::endl;
+        }
+
+        return out;
     }
 
+    friend std::istream& operator>>(std::istream &in, Matrix& m) {
 
+        for (int i = 0; i < m.dim; i++) {
+            for (int j = 0; j < m.dim; j++)
+                in >>m.data[i*m.dim+j];
+        }
+
+        return in;
+    }
 
 };
 
-void readMatrix(std::ifstream &is, Matrix &m) {
-    for (int i = 0; i < m.dim; i++) {
-        for (int j = 0; j < m.dim; j++) {
-            is >> m.data[i * m.dim + j];
-        }
-    }
-}
 
-void writeMatrix(std::ofstream &os, Matrix &m) {
-    for (int i = 0; i < m.dim; i++) {
-        for (int j = 0; j < m.dim; j++) {
-            os << m.data[i * m.dim + j]<< " " ;
-        }
-        os << endl;
-    }
-}
 
 
 int main() {
@@ -190,21 +197,22 @@ int main() {
     Matrix B(msize);
     Matrix C(msize);
     Matrix D(msize);
+    Matrix K(msize, k);
 
-    readMatrix(fin, A);
-    readMatrix(fin, B);
-    readMatrix(fin, C);
-    readMatrix(fin, D);
 
     ofstream fout("output.txt");
 
-    Matrix K(msize, k);
+
 
 
     Matrix R = (A + B * (!C) + K) * (!D);
 
-    writeMatrix(fout, R);
 
+    fin >> A >> B >> C >> D;
+
+    Matrix example_result = ((A + B * (!C) + K) * (!D));
+
+    fout << example_result;
 
     fin.close();
     fout.close();
