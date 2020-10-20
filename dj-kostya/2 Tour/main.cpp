@@ -8,7 +8,7 @@ enum class MovRotation {
 };
 
 enum class AnimalType {
-    Rabbit, Wolf
+    Rabbit, Wolf, Giena
 };
 
 MovRotation operator++(MovRotation &color) {
@@ -203,19 +203,19 @@ public:
         y %= sim.get_height();
         if ((sim.get_current_step() - birth_step) > 0 && (sim.get_current_step() - birth_step) % constancy == 0) {
             switch (rot) {
-                case MovRotation::UP:{
+                case MovRotation::UP: {
                     rot = MovRotation::RIGHT;
                     break;
                 }
-                case MovRotation::RIGHT:{
+                case MovRotation::RIGHT: {
                     rot = MovRotation::DOWN;
                     break;
                 }
-                case MovRotation::DOWN:{
+                case MovRotation::DOWN: {
                     rot = MovRotation::LEFT;
                     break;
                 }
-                case MovRotation::LEFT:{
+                case MovRotation::LEFT: {
                     rot = MovRotation::UP;
                     break;
                 }
@@ -246,6 +246,23 @@ public:
         return type;
     }
 
+    bool operator<(BaseAnimal &other) {
+        if (this->age > other.age)
+            return false;
+        else if (this->age < other.age)
+            return true;
+        else {
+            if (is_root_parent && other.is_root_parent)
+                return id > other.id;
+            else if (is_root_parent)
+                return false;
+            else if (other.is_root_parent)
+                return true;
+            return *(BaseAnimal *) (sim.get_parent(this->parent_id)) <
+                   *(BaseAnimal *) (sim.get_parent(other.parent_id));
+        }
+    }
+
 };
 
 class Rabbit : public BaseAnimal {
@@ -266,6 +283,7 @@ public:
 };
 
 class Wolf : public BaseAnimal {
+protected:
     size_t kills = 0;
     const size_t reproduction_kills = 2;
 public:
@@ -286,24 +304,30 @@ public:
     void kill() {
         kills++;
     }
-
-    bool operator<(Wolf &other) {
-        if (this->age > other.age)
-            return false;
-        else if (this->age < other.age)
-            return true;
-        else {
-            if (is_root_parent && other.is_root_parent)
-                return id > other.id;
-            else if (is_root_parent)
-                return false;
-            else if (other.is_root_parent)
-                return true;
-            return *(Wolf *) (sim.get_parent(this->parent_id)) < *(Wolf *) (sim.get_parent(other.parent_id));
-        }
-    }
 };
 
+
+class Giena : public Wolf {
+private:
+    bool can_kill_ = true;
+public:
+    Giena(size_t x_, size_t y_, MovRotation start_rot, const size_t constancy_, Simulation &sim_) :
+            Wolf(x_, y_, start_rot, constancy_, sim) {}
+
+    Giena(BaseAnimal *parent, Simulation &sim_) : Wolf(parent, sim_) {}
+
+    void reset_kill() {
+        if (!is_die && kills == reproduction_kills) {
+            kills = 0;
+            can_kill_ = false;
+        }
+    }
+
+    bool can_kill() const {
+        return can_kill_;
+    }
+
+};
 
 void Simulation::step() {
     cur_step++;
@@ -426,7 +450,7 @@ int main() {
     Simulation test(H, W, steps);
     fin >> test;
     test.run();
-    fout << test<< std::endl;
+    fout << test << std::endl;
 
 
     return 0;
