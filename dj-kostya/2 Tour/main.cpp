@@ -2,27 +2,23 @@
 #include <fstream>
 #include <cstring>
 #include <vector>
+#include <algorithm>
+
+#define HYENA_AVAILABLE
+#ifdef HYENA_AVAILABLE
+#define ANIMAL_CNT 3
+#else
+#define ANIMAL_CNT 2
+#endif
 
 enum class MovRotation {
     UP, RIGHT, DOWN, LEFT
 };
 
 enum class AnimalType {
-    Rabbit, Wolf, Giena
+    Rabbit, Wolf, Hyena
 };
 
-MovRotation operator++(MovRotation &color) {
-    switch (color) {
-        case MovRotation::UP:
-            return MovRotation::RIGHT;
-        case MovRotation::RIGHT:
-            return MovRotation::DOWN;
-        case MovRotation::DOWN:
-            return MovRotation::LEFT;
-        case MovRotation::LEFT:
-            return MovRotation::UP;
-    }
-}
 
 typedef struct sPoint {
     size_t x;
@@ -46,6 +42,10 @@ public:
     virtual bool must_multiply() = 0;
 
     virtual AnimalType get_animal_type() = 0;
+
+    virtual bool can_kill() const {
+        return false;
+    }
 };
 
 class Simulation {
@@ -98,10 +98,17 @@ public:
 
                 int size = 0;
                 for (auto j : m.field[y][x]) {
-                    if (j->get_animal_type() == AnimalType::Wolf)
-                        size--;
-                    else if (j->get_animal_type() == AnimalType::Rabbit)
-                        size++;
+                    switch (j->get_animal_type()) {
+
+                        case AnimalType::Rabbit:
+                            size++;
+                            break;
+                        case AnimalType::Wolf:
+                        case AnimalType::Hyena:
+                            size--;
+                            break;
+                    }
+
                 }
                 if (size == 0) os << '#';
                 else os << size;
@@ -247,6 +254,9 @@ public:
     }
 
     bool operator<(BaseAnimal &other) {
+        if (this->can_kill() != other.can_kill()) {
+            return this->can_kill() < other.can_kill();
+        }
         if (this->age > other.age)
             return false;
         else if (this->age < other.age)
@@ -286,6 +296,10 @@ class Wolf : public BaseAnimal {
 protected:
     size_t kills = 0;
     const size_t reproduction_kills = 2;
+protected:
+    Wolf(size_t x_, size_t y_, MovRotation start_rot, const size_t constancy_, Simulation &sim_, AnimalType anim_type) :
+            BaseAnimal(x_, y_, start_rot, constancy_, 2, 10, anim_type, sim_) {}
+
 public:
     Wolf(BaseAnimal *parent, Simulation &sim_) : BaseAnimal(parent, sim_) {}
 
@@ -304,17 +318,21 @@ public:
     void kill() {
         kills++;
     }
+
+    virtual bool can_kill() const override {
+        return true;
+    }
 };
 
 
-class Giena : public Wolf {
+class Hyena : public Wolf {
 private:
     bool can_kill_ = true;
 public:
-    Giena(size_t x_, size_t y_, MovRotation start_rot, const size_t constancy_, Simulation &sim_) :
-            Wolf(x_, y_, start_rot, constancy_, sim) {}
+    Hyena(size_t x_, size_t y_, MovRotation start_rot, const size_t constancy_, Simulation &sim_) :
+            Wolf(x_, y_, start_rot, constancy_, sim_, AnimalType::Hyena) {}
 
-    Giena(BaseAnimal *parent, Simulation &sim_) : Wolf(parent, sim_) {}
+    Hyena(BaseAnimal *parent, Simulation &sim_) : Wolf(parent, sim_) {}
 
     void reset_kill() {
         if (!is_die && kills == reproduction_kills) {
@@ -323,7 +341,7 @@ public:
         }
     }
 
-    bool can_kill() const {
+    bool can_kill() const override {
         return can_kill_;
     }
 
@@ -331,6 +349,7 @@ public:
 
 void Simulation::step() {
     cur_step++;
+    // moving
     for (auto *animal: animals) {
         if (animal->is_dead())
             continue;
@@ -345,31 +364,71 @@ void Simulation::step() {
         Point new_pos = animal->move();
         field[new_pos.y][new_pos.x].push_back(animal);
     }
-
+    // eating
     for (int x = 0; x < width; x++) {
         for (int y = 0; y < height; y++) {
-            size_t field_size = field[y][x].size();
-            if (!field_size) continue;
-            Wolf *oldest_wolf = nullptr;
-            for (int j = 0; j < field_size; j++) {
-                if (field[y][x][j]->get_animal_type() == AnimalType::Wolf) {
-                    if (oldest_wolf == nullptr || *oldest_wolf < *(Wolf *) field[y][x][j])
-                        oldest_wolf = (Wolf *) field[y][x][j];
+            while (true) {
+                size_t field_size = field[y][x].size();
+                if (!field_size || field_size == 1) break;
+                sort(field[y][x].begin(), field[y][x].end(), [](const IAnimal *lhs, const IAnimal *rhs) {
+                    return *(BaseAnimal *) rhs < *(BaseAnimal *) lhs;
+                });
+                BaseAnimal *oldest_animal = nullptr;
+                bool has_hungry_animal = false;
+                for (int j = 0; j < field_size; j++) {
+                    switch (field[y][x][j]->get_animal_type()) {
+                        case AnimalType::Rabbit: {
+                            has_hungry_animal = false;
+                        }
+                        case AnimalType::Hyena:
+                        case AnimalType::Wolf: {
+                            if (field[y][x][j]->can_kill()) {
+                                oldest_animal = (BaseAnimal *) field[y][x][j];
+                                has_hungry_animal = true;
+                            } else {
+                                has_hungry_animal = false;
+                            }
+                        }
+                    }
+                    if (has_hungry_animal) break;
                 }
-            }
-            if (oldest_wolf == nullptr)
-                continue;
+                if (oldest_animal == nullptr)
+                    break;
+                bool has_kill = false;
+                for (int j = 0; j < field[y][x].size(); j++) {
+                    if (oldest_animal == field[y][x][j]) continue;
+                    switch (oldest_animal->get_animal_type()) {
+                        case AnimalType::Rabbit:
+                            break;
+                        case AnimalType::Wolf: {
+                            if (field[y][x][j]->get_animal_type() == AnimalType::Rabbit) {
+                                field[y][x][j]->dying();
+                                field[y][x].erase(field[y][x].begin() + j);
+                                j--;
+                                ((Wolf *) oldest_animal)->kill();
+                                has_kill = true;
+                            }
+                            break;
+                        }
 
-            for (int j = 0; j < field[y][x].size(); j++) {
-                if (field[y][x][j]->get_animal_type() == AnimalType::Rabbit) {
-                    field[y][x][j]->dying();
-                    field[y][x].erase(field[y][x].begin() + j);
-                    j--;
-                    oldest_wolf->kill();
+                        case AnimalType::Hyena: {
+
+                            field[y][x][j]->dying();
+                            field[y][x].erase(field[y][x].begin() + j);
+                            j--;
+                            ((Hyena *) oldest_animal)->kill();
+                            has_kill = true;
+
+                            break;
+                        }
+                    }
                 }
+                if (!has_kill) break;
             }
+
         }
     }
+    // aging and multiplying
     for (auto *animal: animals) {
         if (animal->is_dead()) continue;
         animal->aging();
@@ -384,8 +443,14 @@ void Simulation::step() {
                     ((Wolf *) animal)->reset_kills();
                     break;
                 }
+                case AnimalType::Hyena: {
+                    spawn_animal(new Hyena((BaseAnimal *) animal, *this));
+                    ((Hyena *) animal)->reset_kills();
+                    break;
+                }
             }
         }
+        // dying
         if (animal->must_die()) {
             Point old_position = animal->get_pos();
             for (int i = 0; i < field[old_position.y][old_position.x].size(); i++) {
@@ -404,12 +469,20 @@ std::istream &operator>>(std::istream &os, Simulation &m) {
     int r = 0;
     int w = 0;
     os >> r >> w;
-    for (int t = 0; t < 2; t++) {
+#ifdef HYENA_AVAILABLE
+    int h;
+    os >> h;
+#endif
+    for (int t = 0; t < ANIMAL_CNT; t++) {
         int max_s = 0;
         if (t == 0)
             max_s = r;
         else if (t == 1)
             max_s = w;
+#ifdef HYENA_AVAILABLE
+        else if (t == 2)
+            max_s = h;
+#endif
 
         for (int i = 0; i < max_s; i++) {
             int x, y, d, k;
@@ -435,6 +508,10 @@ std::istream &operator>>(std::istream &os, Simulation &m) {
                 m.spawn_animal(new Rabbit(x, y, rot, k, m));
             else if (t == 1)
                 m.spawn_animal(new Wolf(x, y, rot, k, m));
+#ifdef HYENA_AVAILABLE
+            else if (t == 2)
+                m.spawn_animal(new Hyena(x, y, rot, k, m));
+#endif
         }
     }
     return os;
