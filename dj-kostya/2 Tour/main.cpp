@@ -27,6 +27,8 @@ typedef struct sPoint {
 
 class IAnimal {
 public:
+    int selectedInStep = -1;
+
     virtual Point move() = 0;
 
     virtual Point get_pos() = 0;
@@ -140,6 +142,8 @@ class BaseAnimal : public IAnimal {
     const size_t constancy;
     MovRotation rot;
     const AnimalType type;
+
+
 protected:
     const bool is_root_parent;
     const size_t id;
@@ -150,6 +154,7 @@ protected:
     size_t age = 0;
 
 public:
+
     BaseAnimal(BaseAnimal *parent, Simulation &sim_) : id(sim_.get_new_id()),
                                                        parent_id(parent->id),
                                                        x(parent->x),
@@ -319,7 +324,7 @@ public:
         kills++;
     }
 
-    virtual bool can_kill() const override {
+    bool can_kill() const override {
         return true;
     }
 };
@@ -328,6 +333,7 @@ public:
 class Hyena : public Wolf {
 private:
     bool can_kill_ = true;
+
 public:
     Hyena(size_t x_, size_t y_, MovRotation start_rot, const size_t constancy_, Simulation &sim_) :
             Wolf(x_, y_, start_rot, constancy_, sim_, AnimalType::Hyena) {}
@@ -342,7 +348,7 @@ public:
     }
 
     bool can_kill() const override {
-        return can_kill_;
+        return kills < reproduction_kills;
     }
 
 };
@@ -376,6 +382,7 @@ void Simulation::step() {
                 BaseAnimal *oldest_animal = nullptr;
                 bool has_hungry_animal = false;
                 for (int j = 0; j < field_size; j++) {
+                    if (field[y][x][j]->selectedInStep == cur_step) continue;
                     switch (field[y][x][j]->get_animal_type()) {
                         case AnimalType::Rabbit: {
                             has_hungry_animal = false;
@@ -394,9 +401,11 @@ void Simulation::step() {
                 }
                 if (oldest_animal == nullptr)
                     break;
+                oldest_animal->selectedInStep = cur_step;
                 bool has_kill = false;
                 for (int j = 0; j < field[y][x].size(); j++) {
                     if (oldest_animal == field[y][x][j]) continue;
+                    if (!oldest_animal->can_kill()) break;
                     switch (oldest_animal->get_animal_type()) {
                         case AnimalType::Rabbit:
                             break;
