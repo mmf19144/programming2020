@@ -1,8 +1,8 @@
 
 #include <iostream>
 #include <fstream>
-
-
+#include <cstdio>
+#include <stdio.h>
 using namespace std;
 
 
@@ -11,12 +11,13 @@ class Matrix {
     int dim;
 
 public:
-
+    //friend std::istream& operator>>(std::istream& in, Matrix& m);
+    //friend std::ostream& operator<<(std::ostream& out, Matrix& m);
 
 
 
     Matrix():
-        dim(0), data(nullptr){
+            dim(0), data(nullptr){
     }
     ~Matrix() {
         delete[] data;
@@ -36,7 +37,7 @@ public:
                 this->data[i * num + j] = 0;
             }
         }
-
+        //for (int i = 0; i < num; i++) { this->data[i][i] = 1; }
     }
 
     Matrix(int num, int const *arr) {
@@ -159,7 +160,7 @@ public:
         }
     }
     friend std::ostream& operator<< (std::ostream &out, Matrix& m) {
-
+        //int size = c1.dim;
         for (int i = 0; i < m.dim; i++) {
             for (int j = 0; j < m.dim; j++)
                 out << m.data[i*m.dim + j] << " ";
@@ -170,7 +171,7 @@ public:
     }
 
     friend std::istream& operator>>(std::istream &in, Matrix& m) {
-
+        //int size = c1.getDimension();
         for (int i = 0; i < m.dim; i++) {
             for (int j = 0; j < m.dim; j++)
                 in >>m.data[i*m.dim+j];
@@ -181,7 +182,22 @@ public:
 
 };
 
+/*void readMatrix(std::ifstream &is, Matrix &m) {
+    for (int i = 0; i < m.dim; i++) {
+        for (int j = 0; j < m.dim; j++) {
+            is >> m.data[i * m.dim + j];
+        }
+    }
+}
 
+void writeMatrix(std::ofstream &os, Matrix &m) {
+    for (int i = 0; i < m.dim; i++) {
+        for (int j = 0; j < m.dim; j++) {
+            os << m.data[i * m.dim + j]<< " " ;
+        }
+        os << endl;
+    }
+}*/
 
 
 int main() {
@@ -198,16 +214,19 @@ int main() {
     Matrix C(msize);
     Matrix D(msize);
     Matrix K(msize, k);
-
+    //readMatrix(fin, A);
+    //readMatrix(fin, B);
+    // readMatrix(fin, C);
+    //readMatrix(fin, D);
 
     ofstream fout("output.txt");
 
-
+    //Matrix K(msize, k);
 
 
     Matrix R = (A + B * (!C) + K) * (!D);
 
-
+    //writeMatrix(fout, R);*/
     fin >> A >> B >> C >> D;
 
     Matrix example_result = ((A + B * (!C) + K) * (!D));
