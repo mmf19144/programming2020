@@ -103,11 +103,33 @@ public:
         }
     }
 
+    Matrix (const Matrix& obj) : size(obj.size), matrix(obj.matrix) {
+    }
+
+    Matrix &operator = (const Matrix& obj){
+        assert(obj.matrix != nullptr);
+
+        if (&obj == this){
+            return *this;
+        }
+
+        for (int i=0;i<obj.size;i++){
+            for (int j=0;j<obj.size;j++){
+                (*this)[i][j] = obj[i][j];
+            }
+        }
+
+        return *this;
+
+    }
+
+
     Matrix_row operator[](const size_t row) {
         if (size == 0 || size <= row)
             throw std::invalid_argument("not valid argument for matrix");
         return {size, row, matrix};
     }
+
 
 
     Matrix_col operator()(const size_t column) {
