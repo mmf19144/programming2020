@@ -3,6 +3,7 @@
 #include <cstring>
 #include <unordered_map>
 #include <cassert>
+#include "matrix.h"
 
 using namespace std;
 
@@ -56,10 +57,6 @@ public:
         head = createNode(element);
         head->next = h;
     };
-
-    T getFront() {
-        return head->element;
-    }
 
     class Iterator {
     private:
@@ -127,35 +124,6 @@ public:
         }
         return false;
     };
-
-    bool deleteByValue(T const &element) {
-        if ((*begin()) == element) {
-            Node *node_to_delete = head;
-            head = head->next;
-            delete (node_to_delete);
-            return true;
-        }
-        if (begin() == end()) {
-            return false;
-        }
-
-        auto prev = begin();
-        auto iter = begin();
-        iter++;
-        while (iter != end()) {
-            if ((*iter) == element) {
-                prev.curr->next = iter.curr->next;
-                delete (iter.curr);
-                return true;
-            }
-            iter++;
-            prev++;
-        }
-        if ((*iter) == element) {
-            prev.curr->next = nullptr;
-            delete (iter.curr);
-        }
-    }
 
     void setHead(Node *new_head) {
         head = new_head;
@@ -251,13 +219,17 @@ public:
 
     Value getValueByKey(Key &key) {
         size_t hash = calcHash(key);
-        return data[hash].getFront().second;
+        for (auto iter = data[hash].begin(); iter!= data[hash].end(); ++iter){
+            if ((*iter).first == key){
+                return (*iter).second;
+            }
+        }
     }
 
     size_t getNumOfElements(Key &key) {
         size_t hash = calcHash(key);
         size_t count = 0;
-        for (auto iter = data[hash].begin(); iter != data[hash].end(); iter++) {
+        for (auto iter = data[hash].begin(); iter != data[hash].end(); ++iter) {
             if ((*iter).first == key)
                 count++;
         }
@@ -269,9 +241,9 @@ public:
         size_t count = getNumOfElements(key);
         auto *val_arr = new Value[count];
         size_t id = 0;
-        for (auto iter = data[hash].begin(); iter != data[hash].end(); iter++) {
+        for (auto iter = data[hash].begin(); iter != data[hash].end(); ++iter) {
             if ((*iter).first == key) {
-                val_arr[id] = *iter;
+                val_arr[id] = (*iter).second;
                 id++;
             }
         }
@@ -367,13 +339,15 @@ void run(istream &input, ostream &output) {
     input >> n;
     char action;
     HashMap<Key, Value> hashMap(100, 0.75);
+    Key key;
+    Value val;
     for (size_t i = 0; i < n; i++) {
         input >> action;
-        Key key;
-        Value val;
         if (action == 'A') {
             input >> key >> val;
+            //Used on olympic nsu
             hashMap.replace(key, val);
+            //hashMap.insert(key, val);
         }
         if (action == 'R') {
             input >> key;
@@ -382,6 +356,23 @@ void run(istream &input, ostream &output) {
     }
     output << hashMap.countValues() << " " << hashMap.countUniqueValues();
 }
+
+namespace std {
+    template <> struct hash<Matrix>
+    {
+        size_t operator()(const Matrix & m) const
+        {
+            size_t sum = 0;
+            for (size_t i = 1; i<=m.matrix_size; i++){
+                for (size_t j=1; j<=m.matrix_size; j++){
+                    sum+=std::hash<int>{}(m[i][j]);
+                }
+            }
+            return sum;
+        }
+    };
+}
+
 
 int main() {
     char key_type, val_type;
@@ -409,7 +400,6 @@ int main() {
     } else if (key_type == 'S' && val_type == 'S') {
         run<string, string>(input, output);
     }
-
 
     return 0;
 }
