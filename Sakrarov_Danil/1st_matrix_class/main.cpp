@@ -2,6 +2,7 @@
 #include <fstream>
 #include <cassert>
 #include <cstring>
+
 class Matrix_row {
 private:
     const size_t size;
@@ -103,18 +104,24 @@ public:
         }
     }
 
-    Matrix (const Matrix& obj) : size(obj.size), matrix(obj.matrix) {
+    Matrix(const Matrix &obj) : size(obj.size), matrix(new int[size * size]) {
+        assert(obj.matrix != nullptr);
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                (*this)[i][j] = obj[i][j];
+            }
+        }
     }
 
-    Matrix &operator = (const Matrix& obj){
+    Matrix &operator=(const Matrix &obj) {
         assert(obj.matrix != nullptr);
-
-        if (&obj == this){
+        if (obj.size != size)
+            throw std::invalid_argument("Matrix dimensions must agree");
+        if (&obj == this) {
             return *this;
         }
-
-        for (int i=0;i<obj.size;i++){
-            for (int j=0;j<obj.size;j++){
+        for (int i = 0; i < obj.size; i++) {
+            for (int j = 0; j < obj.size; j++) {
                 (*this)[i][j] = obj[i][j];
             }
         }
@@ -129,7 +136,6 @@ public:
             throw std::invalid_argument("not valid argument for matrix");
         return {size, row, matrix};
     }
-
 
 
     Matrix_col operator()(const size_t column) {
