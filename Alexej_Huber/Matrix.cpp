@@ -53,7 +53,7 @@ public:
 		delete[] data;
 	}
 
-	const Matrix operator+(const Matrix & A) const
+	Matrix operator+(const Matrix & A) const
 	{
 		if (A.size() != sz)
 		{
@@ -156,16 +156,13 @@ public:
 		return false;
 	}
 
-	Matrix operator=(const Matrix & A)
+	Matrix & operator=(const Matrix & A)
 	{
-		for (size_t i = 0; i < sz; i++)
-		{
-			delete[] data;
-		}
+		delete[] data;
 		data = nullptr;
 
 		sz = A.size();
-		data = new int[sz];
+		data = new int[sz * sz];
 
 		for (size_t i = 0; i < sz; i++)
 			for (size_t j = 0; j < sz; j++)
