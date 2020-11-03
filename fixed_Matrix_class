@@ -32,7 +32,7 @@ public:
 
 	Matrix(const Matrix& A) : size{ A.size }
 	{
-		arr = new int [size];
+		arr = new int [size * size];
 
 		for (size_t i = 0; i < size * size; i++) {
 			arr[i] = A.arr[i];
