@@ -3,6 +3,7 @@
 #include <cstring>
 #include <unordered_map>
 #include <cassert>
+#include <vector>
 #include "matrix.h"
 
 using namespace std;
@@ -40,6 +41,7 @@ public:
                 ptr = ptr->next;
                 delete (node_to_delete);
             }
+            delete ptr;
         }
         head = nullptr;
     }
@@ -153,8 +155,8 @@ class HashMap {
         newHashmap.size /= 2;
     }
 
-public:
     LinkedList<pair<Key, Value>> *data;
+public:
 
     HashMap(size_t size, double rehash_value)
             : data(new LinkedList<pair<Key, Value>>[size]),
@@ -182,7 +184,7 @@ public:
     }
 
     void checkRehash() {
-        if ((double) capacity / (double) size >= 0.75) {
+        if ((double) capacity / (double) size >= rehash_value) {
             rehash();
         }
     }
@@ -205,8 +207,6 @@ public:
                 prev.curr->next = iter.curr->next;
                 auto node_to_delete = iter.curr;
                 ++iter;
-                prev = iter;
-                ++iter;
                 delete node_to_delete;
                 capacity--;
             } else {
@@ -219,8 +219,8 @@ public:
 
     Value getValueByKey(Key &key) {
         size_t hash = calcHash(key);
-        for (auto iter = data[hash].begin(); iter!= data[hash].end(); ++iter){
-            if ((*iter).first == key){
+        for (auto iter = data[hash].begin(); iter != data[hash].end(); ++iter) {
+            if ((*iter).first == key) {
                 return (*iter).second;
             }
         }
@@ -236,18 +236,17 @@ public:
         return count;
     }
 
-    Value *getAllValuesByKey(Key &key) {
+    vector<Value> getAllValuesByKey(Key &key) {
+
         size_t hash = calcHash(key);
         size_t count = getNumOfElements(key);
-        auto *val_arr = new Value[count];
-        size_t id = 0;
+        vector<Value> val_vec;
         for (auto iter = data[hash].begin(); iter != data[hash].end(); ++iter) {
             if ((*iter).first == key) {
-                val_arr[id] = (*iter).second;
-                id++;
+                val_vec.push_back((*iter).second);
             }
         }
-        return val_arr;
+        return val_vec;
     }
 
     void replace(Key &key, Value &val) {
@@ -258,10 +257,12 @@ public:
     class Iterator {
     private:
         friend class HashMap<Key, Value>;
-        LinkedList<pair<Key, Value>> *data;
+
         typename LinkedList<pair<Key, Value>>::Iterator list_iter;
-        size_t data_id;
-        size_t data_size;
+
+        LinkedList<pair<Key, Value>> *cur_list;
+        LinkedList<pair<Key, Value>> *end_list;
+
 
     public:
         Iterator() = default;
@@ -274,21 +275,29 @@ public:
         Iterator &operator++() {
             ++list_iter;
             if (list_iter.isNull()) {
-                data_id++;
-                while (data_id < data_size && data[data_id].isNull())
-                    data_id++;
-                if (data_id != data_size)
-                    list_iter = data[data_id].begin();
+                cur_list++;
+                while (cur_list != end_list && cur_list->isNull())
+                    cur_list++;
+                if (cur_list != end_list)
+                    list_iter = cur_list->begin();
+
             }
             return *this;
         }
 
         bool operator!=(Iterator const &that) const {
-            if (data_id != that.data_id) return true;
+            if (cur_list == end_list && that.cur_list == end_list) {
+                return false;
+            }
+            if (cur_list != that.cur_list)
+                return true;
             return (this->list_iter != that.list_iter);
         }
 
         bool operator==(Iterator const &that) const {
+            if (cur_list == end_list && that.cur_list == end_list) {
+                return true;
+            }
             return (this->list_iter == that.list_iter);
         }
     };
@@ -297,23 +306,18 @@ public:
         if (capacity == 0)
             return end();
         Iterator it;
-        it.data = data;
-        it.data_size = size;
-        for (size_t id = 0; id < size; id++) {
-            if (!data[id].isNull()) {
-                it.data_id = id;
-                it.list_iter = data[id].begin();
-                break;
-            }
+        it.cur_list = data;
+        it.end_list = &data[size];
+        while (it.cur_list->isNull()) {
+            it.cur_list++;
         }
+        it.list_iter = it.cur_list->begin();
         return it;
     }
 
     Iterator end() {
         Iterator it;
-        it.data = data;
-        it.data_size = size;
-        it.data_id = size;
+        it.cur_list = &data[size];
         return it;
     }
 
@@ -322,7 +326,7 @@ public:
     }
 
     size_t countUniqueValues() {
-        if (countValues()==0)
+        if (countValues() == 0)
             return 0;
         HashMap<Value, Value> map(size, rehash_value);
         for (auto iter = this->begin(); iter != this->end(); ++iter) {
@@ -358,14 +362,13 @@ void run(istream &input, ostream &output) {
 }
 
 namespace std {
-    template <> struct hash<Matrix>
-    {
-        size_t operator()(const Matrix & m) const
-        {
+    template<>
+    struct hash<Matrix> {
+        size_t operator()(const Matrix &m) const {
             size_t sum = 0;
-            for (size_t i = 1; i<=m.matrix_size; i++){
-                for (size_t j=1; j<=m.matrix_size; j++){
-                    sum+=std::hash<int>{}(m[i][j]);
+            for (size_t i = 1; i <= m.matrix_size; i++) {
+                for (size_t j = 1; j <= m.matrix_size; j++) {
+                    sum += std::hash<int>{}(m[i][j]);
                 }
             }
             return sum;
