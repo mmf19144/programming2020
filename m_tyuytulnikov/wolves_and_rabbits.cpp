@@ -19,8 +19,6 @@ enum Direction {
 };
 
 class Animal {
-    int x;
-    int y;
     const size_t birth_tick;
     size_t steps_done;
     const size_t velocity;
@@ -29,13 +27,16 @@ class Animal {
     size_t age;
 
 protected:
+    int x;
+    int y;
     const Animal_type animal_type; //0 for wolf, 1 for rabbit, 2 for hyena
     size_t saturation;
-
-public:
     Direction direction;
     const size_t constancy;
     size_t last_duplication;
+
+public:
+
 
     size_t getAge() {
         return age;
@@ -65,6 +66,8 @@ public:
               animal_type(animal_type), parent(parent),
               saturation(0), age(0), last_duplication(0) {
     }
+
+    ~Animal()= default;
 
     pair<size_t, size_t> move(size_t x_size, size_t y_size) {
         age++;
@@ -111,11 +114,15 @@ public:
                     break;
             }
         }
-        auto p = make_pair<size_t, size_t>((size_t)x, (size_t )y);
+        auto p = make_pair<size_t, size_t>((size_t) x, (size_t) y);
         return p;
     }
 
-    virtual void eat(Animal *animal) = 0;
+    virtual void eat(vector<Animal *> &animals) = 0;
+
+    virtual void duplicate(vector<Animal *> &animals, size_t tick) = 0;
+
+    virtual bool needToBeKilled() = 0;
 
     bool operator>(const Animal &other) {
         if (birth_tick < other.birth_tick) return true;
@@ -145,12 +152,29 @@ public:
             : Animal(x, y, dir, constancy, birth, 2, vector_id, WOLF, parent) {
     }
 
-    void eat(Animal *animal) override {
-        if (animal->getType() == RABBIT) {
-            saturation++;
+    void eat(vector<Animal *> &animals) override {
+        auto iter = animals.begin();
+        while (iter != animals.end()) {
+            if ((*iter)->getType() == RABBIT) {
+                saturation++;
+                iter = animals.erase(iter);
+            } else {
+                ++iter;
+            }
         }
     }
 
+    void duplicate(vector<Animal *> &animals, size_t tick) override {
+        if (getSaturation() >= 2 && last_duplication < tick) { //WOLF
+            resetSaturation();
+            last_duplication = tick;
+            auto *new_wolf = new Wolf(this->x, y, direction, constancy, tick, 0, this);
+            animals.emplace_back(new_wolf);
+        }
+    }
+    bool needToBeKilled() override{
+        return getAge() >= 15;
+    }
 };
 
 class Rabbit : public Animal {
@@ -159,7 +183,19 @@ public:
             : Animal(x, y, dir, constancy, birth, 1, vector_id, RABBIT, parent) {
     }
 
-    void eat(Animal *animal) override {
+    void eat(vector<Animal *> &animals) override {}
+
+    void duplicate(vector<Animal *> &animals, size_t tick) override {
+        if (last_duplication < tick && (getAge() == 5 || getAge() == 10)) {
+            last_duplication = tick;
+            auto *new_rabbit = new Rabbit(x, y, direction, constancy,
+                                          tick, 0, this);
+            animals.emplace_back(new_rabbit);
+        }
+    }
+
+    bool needToBeKilled() override{
+        return getAge() >= 10;
     }
 };
 
@@ -169,16 +205,42 @@ public:
             : Animal(x, y, dir, constancy, birth, 2, vector_id, HYENA, parent) {
     }
 
-    void eat(Animal *animal) override {
-        saturation++;
+    void eat(vector<Animal *> &animals) override {
+        auto iter = animals.begin();
+        for (size_t i = 0; i < 2; i++) {
+            if ((*iter) != this) {
+                iter = animals.erase(iter);
+                saturation++;
+            } else if (iter != animals.end()) {
+                iter = animals.erase(iter + 1);
+                saturation++;
+            } else {
+                return;
+            }
+        }
     }
+
+    void duplicate(vector<Animal *> &animals, size_t tick) override {
+        if (getSaturation() >= 2 && last_duplication < tick) {
+            resetSaturation();
+            last_duplication = tick;
+            auto *new_hyena = new Hyena(x, y, direction, constancy,
+                                        tick, 0, this);
+            animals.emplace_back(new_hyena);
+        }
+    }
+
+    bool needToBeKilled() override{
+        return getAge() >= 15;
+    }
+
 };
 
 class Simulation {
     const size_t x_size;
     const size_t y_size;
     vector<Animal *> *field;
-    vector<Animal *> animals;
+    vector<Animal *> animals; //contains all animals till the deconstruction of simulation
 public:
     Simulation(size_t x_size, size_t y_size, size_t wolves_num, size_t rabbits_num, size_t hyenas_num,
                size_t *wolves_x, size_t *wolves_y, size_t *wolves_dir, size_t *wolves_const,
@@ -233,7 +295,7 @@ public:
     }
 
     ~Simulation() {
-        for (auto const &animal: animals) {
+        for (auto const &animal: animals) { //deletes ALL animals
             delete (animal);
         }
         delete[] field;
@@ -272,28 +334,10 @@ private:
                 //DESCENDING sort
                 auto eater = cur_cell.begin();
                 while (eater != cur_cell.end()) {
-                    if ((*eater)->getType() == HYENA) {
-                        for (size_t i = 0; i < 2; i++)
-                            if (eater + 1 != cur_cell.end()) {
-                                (*eater)->eat(*(eater + 1));
-                                eater = cur_cell.erase(eater + 1);
-                            }
-                    } else if ((*eater)->getType() == WOLF) {
-                        Animal *wolf = *eater;
-                        auto iter = cur_cell.begin();
-                        while (iter != cur_cell.end()) {
-                            if ((*iter)->getType() == RABBIT) {
-                                wolf->eat((*iter));
-                                iter = cur_cell.erase(iter);
-                            } else {
-                                ++iter;
-                            }
-                        }
-                        eater = std::find(cur_cell.begin(), cur_cell.end(), wolf);
-                    }
+                    Animal *cur_animal = (*eater);
+                    (*eater)->eat(cur_cell);
+                    eater = std::find(cur_cell.begin(), cur_cell.end(), cur_animal);
                     ++eater;
-
-
                 }
             }
         }
@@ -302,35 +346,13 @@ private:
     void duplicate_animals(size_t tick) {
         for (size_t x = 0; x < x_size; x++) {
             for (size_t y = 0; y < y_size; y++) {
-                auto iter = field[x + y * x_size].begin();
-                while (iter != field[x + y * x_size].end()) {
-                    if ((*iter)->getType() == WOLF && (*iter)->getSaturation() >= 2 &&
-                        (*iter)->last_duplication < tick) { //WOLF
-                        (*iter)->resetSaturation();
-                        (*iter)->last_duplication = tick;
-                        auto *new_wolf = new Wolf(x, y, (*iter)->direction, (*iter)->constancy,
-                                                  tick, 0, (*iter));
-                        field[x + y * x_size].emplace_back(new_wolf);
-                        iter = field[x + y * x_size].begin();
-                    } else if ((*iter)->getType() == RABBIT && (*iter)->last_duplication < tick &&
-                               ((*iter)->getAge() == 5 || (*iter)->getAge() == 10)) {
-                        (*iter)->last_duplication = tick;
-                        auto *new_rabbit = new Rabbit(x, y, (*iter)->direction, (*iter)->constancy,
-                                                      tick, 0, (*iter));
-                        field[x + y * x_size].emplace_back(new_rabbit);
-                        iter = field[x + y * x_size].begin();
-                    } else if ((*iter)->getType() == HYENA && (*iter)->getSaturation() >= 2 &&
-                               (*iter)->last_duplication < tick) {
-                        (*iter)->resetSaturation();
-                        (*iter)->last_duplication = tick;
-                        auto *new_hyena = new Hyena(x, y, (*iter)->direction, (*iter)->constancy,
-                                                    tick, 0, (*iter));
-                        field[x + y * x_size].emplace_back(new_hyena);
-                        iter = field[x + y * x_size].begin();
-                    } else {
-                        ++iter;
-                    }
-
+                vector<Animal *> &cur_cell = field[x + y * x_size];
+                auto iter = cur_cell.begin();
+                while (iter != cur_cell.end()) {
+                    Animal* cur_animal = *iter;
+                    (*iter)->duplicate(cur_cell, tick);
+                    iter = std::find(cur_cell.begin(), cur_cell.end(), cur_animal);
+                    ++iter;
                 }
             }
         }
@@ -341,11 +363,10 @@ private:
             for (size_t y = 0; y < y_size; y++) {
                 auto iter = field[x + y * x_size].begin();
                 while (iter != field[x + y * x_size].end()) {
-                    if (((*iter)->getType() == WOLF || (*iter)->getType() == HYENA) && (*iter)->getAge() == 15) {
+                    if ((*iter)->needToBeKilled()){
                         iter = field[x + y * x_size].erase(iter);
-                    } else if ((*iter)->getType() == RABBIT && (*iter)->getAge() == 10) {
-                        iter = field[x + y * x_size].erase(iter);
-                    } else ++iter;
+                    } else
+                        ++iter;
                 }
             }
         }
