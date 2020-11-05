@@ -7,7 +7,6 @@
 
 using namespace std;
 
-
 class Expression 
 {
 public:
@@ -19,16 +18,23 @@ public:
 		return out;
 	}
 	virtual Expression* derivative(string var) const = 0;
-	virtual double eval (string eval) const = 0;
+	virtual int eval (string eval) const = 0;
 	virtual Expression* simplification() const = 0; 
+	virtual Expression* copy() const = 0;
 };
 class Number : public Expression 
 {
-	double val;
+	int val;
 	friend Expression* build(string exp);
 
 public:
-	Number(double val) : val(val){}
+	Number (const Number& that) {
+		this->val = that.val;
+	}
+	Number(int val) : val(val){}
+	virtual Expression* copy() const{
+		return new Number(this->val);
+	}
 	virtual string to_string() const
 	{
 		return std::to_string(val);
@@ -37,7 +43,7 @@ public:
 	{
 		return new Number(0);
 	}
-	virtual double eval(string eval) const
+	virtual int eval(string eval) const
 	{
 		return val;
 	}
@@ -51,7 +57,13 @@ class Variable : public Expression
 	string var;
 	friend Expression* build(string exp);
 public:
+	Variable(const Variable& that) {
+		this->var = that.var;
+	}
 	Variable(string var) : var(var){}
+	virtual Expression* copy() const {
+		return new Variable(this->var);
+	}
 	virtual string to_string() const
 	{
 		return var;
@@ -64,24 +76,33 @@ public:
 		}
 		return new Number(0);
 	}
-	virtual double eval(string eval) const
+	virtual int eval(string eval) const
 	{
 		size_t i = eval.find(this -> var + " <- ");
 		if (i == string::npos)
 		{
 			throw invalid_argument("incorrect eval");
 		}
+		if (i > 0) {
+			size_t i = eval.find(" " + this->var + " <- ");
+			if (i == string::npos)
+			{
+				throw invalid_argument("incorrect eval");
+			}
+			i++;
+		}
 		string x = "";
 		size_t delimeter = eval.find(";", i + 1);
-		if (delimeter = string::npos)
+		if (delimeter == string::npos)
 		{
 			delimeter = eval.length();
 		}
-		i += 4 + this-> var.length();
+		i += 4 + this->var.length();
 		x = eval.substr(i, delimeter - i);
-		double res = stod(x);
+		int res = (int)stod(x);
 		return res;
 	}
+
 	virtual Expression* simplification() const
 	{
 		return new Variable(var);
@@ -96,6 +117,13 @@ class Add : public Expression
 	friend class Div;
 	friend Expression* build(string exp);
 public:
+	Add(const Add& that) {
+		this->left = that.left->copy();
+		this->right = that.right->copy();
+	}
+	virtual Expression* copy() const {
+		return new Add(this->left->copy(), this->right->copy());
+	}
 	virtual string to_string() const
 	{
 		string str = "";
@@ -115,7 +143,7 @@ public:
 		delete left;
 		delete right;
 	}
-	virtual double eval(string eval) const
+	virtual int eval(string eval) const
 	{
 		return left -> eval(eval) + right -> eval(eval);
 	}
@@ -127,14 +155,18 @@ public:
 		Number* left_number = dynamic_cast <Number*> (left_simpl);
 		if (right_number && right_number->eval("") == 0)
 		{
+			delete right_simpl;
 			return left_simpl;
 		}
 		if (left_number && left_number->eval("") == 0)
 		{
+			delete left_simpl;
 			return right_simpl;
 		}
 		if (left_number && right_number)
 		{
+			delete left_simpl;
+			delete right_simpl;
 			return new Number(left_number->eval("") + right_number->eval(""));
 		}
 		return new Add(left_simpl, right_simpl);
@@ -148,6 +180,13 @@ class Sub : public Expression
 	friend class Div;
 	friend Expression* build(string exp);
 public:
+	Sub(const Sub& that) {
+		this->left = that.left->copy();
+		this->right = that.right->copy();
+	}
+	virtual Expression* copy() const {
+		return new Sub(this->left->copy(), this->right->copy());
+	}
 	virtual string to_string() const
 	{
 		string str = "";
@@ -167,7 +206,7 @@ public:
 	{
 		return new Sub(left->derivative(var), right->derivative(var));
 	}
-	virtual double eval(string eval) const
+	virtual int eval(string eval) const
 	{
 		return left->eval(eval) - right->eval(eval);
 	}
@@ -179,14 +218,19 @@ public:
 		Number* left_number = dynamic_cast <Number*> (left_simpl);
 		if (right_number && right_number->eval("") == 0)
 		{
+			delete right_simpl;
 			return left_simpl;
 		}
 		if (left_number && right_number)
 		{
+			delete left_simpl;
+			delete right_simpl;
 			return new Number(left_number->eval("") - right_number->eval(""));
 		}
 		if (left_simpl->to_string() == right_simpl->to_string())
 		{
+			delete left_simpl;
+			delete right_simpl;
 			return new Number(0);
 		}
 		return new Sub(left_simpl, right_simpl);
@@ -200,6 +244,13 @@ class Mul : public Expression
 	friend class Div;
 	friend Expression* build(string exp);
 public:
+	Mul(const Mul& that) {
+		this->left = that.left->copy();
+		this->right = that.right->copy();
+	}
+	virtual Expression* copy() const {
+		return new Mul(this->left->copy(), this->right->copy());
+	}
 	virtual string to_string() const
 	{
 		string str = "";
@@ -212,14 +263,14 @@ public:
 	}
 	virtual Expression* derivative(string var) const
 	{
-		return new Add(new Mul(left->derivative(var),right), new Mul(left, right->derivative(var)));
+		return new Add(new Mul(left->derivative(var),right->copy()), new Mul(left->copy(), right->derivative(var)));
 	}
 	~Mul()
 	{
 		delete left;
 		delete right;
 	}
-	virtual double eval(string eval) const
+	virtual int eval(string eval) const
 	{
 		return left->eval(eval) * right->eval(eval);
 	}
@@ -233,10 +284,13 @@ public:
 		{
 			if (left_number->eval("") == 0)
 			{
+				delete left_simpl;
+				delete right_simpl;
 				return new Number(0);
 			}
 			else if (left_number->eval("") == 1)
 			{
+				delete left_simpl;
 				return right_simpl;
 			}
 		}
@@ -244,15 +298,20 @@ public:
 		{
 			if (right_number->eval("") == 0)
 			{
+				delete left_simpl;
+				delete right_simpl;
 				return new Number(0);
 			}
 			else if (right_number->eval("") == 1)
 			{
+				delete right_simpl;
 				return left_simpl;
 			}
 		}
 		if (left_number && right_number)
 		{
+			delete left_simpl;
+			delete right_simpl;
 			return new Number(left_number->eval("") * right_number->eval(""));
 		}
 		return new Mul(left_simpl, right_simpl);
@@ -265,6 +324,13 @@ class Div : public Expression
 	Div(Expression* left, Expression* right) : numerator(left), denominator(right) {}
 	friend Expression* build(string exp);
 public:
+	Div(const Div& that) {
+		this->numerator = that.numerator->copy();
+		this->denominator = that.denominator->copy();
+	}
+	virtual Expression* copy() const {
+		return new Div(this->numerator->copy(), this->denominator->copy());
+	}
 	virtual string to_string() const
 	{
 		string str = "";
@@ -277,14 +343,14 @@ public:
 	}
 	virtual Expression* derivative(string var) const
 	{
-		return new Div(new Sub(new Mul(numerator->derivative(var),denominator), new Mul(denominator->derivative(var),numerator)), new Mul (denominator, denominator));
+		return new Div(new Sub(new Mul(numerator->derivative(var),denominator->copy()), new Mul(denominator->derivative(var),numerator->copy())), new Mul (denominator->copy(), denominator->copy()));
 	}
 	~Div()
 	{
 		delete numerator;
 		delete denominator;
 	}
-	virtual double eval(string eval) const
+	virtual int eval(string eval) const
 	{
 		return numerator -> eval(eval) / denominator -> eval(eval);
 	}
@@ -296,14 +362,19 @@ public:
 		Number* numerator_number = dynamic_cast <Number*> (numerator_simpl);
 		if (numerator_number && numerator_number->eval("") == 0 && denominator_number -> eval("") != 0)
 		{
+			delete numerator_simpl;
+			delete denominator_simpl;
 			return new Number(0);
 		}
 		if (denominator_number && denominator_number->eval("") == 1)
 		{
+			delete denominator_simpl;
 			return numerator_simpl;
 		}
 		if (numerator_number && denominator_number)
 		{
+			delete denominator_simpl;
+			delete numerator_simpl;
 			return new Number(numerator_number->eval("") / denominator_number->eval(""));
 		}
 		return new Div(numerator_simpl, denominator_simpl);
@@ -313,13 +384,10 @@ Expression* build(string exp)
 {
 	if (exp.find('(') == string::npos)
 	{
-		try {
-			return new Number(stod(exp));
+		if (isdigit(exp[0])) {
+			return new Number((int)stod(exp));
 		}
-		catch (invalid_argument) 
-		{
-			return new Variable(exp);
-		}
+		return new Variable(exp);
 	}
 	exp = exp.substr(1, exp.length() - 2);
 	int cnt = 0;
@@ -502,11 +570,13 @@ int main()
 	in.close();
 	ofstream out("output.txt");
 	res->print(out);
-	out << endl;
-	double res1 = res->eval("x <- 8; y <- 5; xy <- 8");
+	//out << endl;
+	/*double res1 = res->eval("x <- 8; y <- 5; xy <- 8");
 	out << res1 << endl;
 	Expression* r = exp->simplification();
-	r -> print(out);
+	r -> print(out);*/
 	out.close();
 	return 0;
+
 }
+
