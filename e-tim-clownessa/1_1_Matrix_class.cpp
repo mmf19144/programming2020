@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <assert.h>
-#include <time.h>
 using namespace std;
 
 class Matrix{
@@ -25,9 +24,11 @@ class Matrix{
 	void copy(const Matrix& orig) {
 		this->n = orig.n;
 		init(this->n);
-		for (int i = 0; i < n; i++)
-			for (int j = 0; j < n; j++)
+		for (int i = 0; i < n; i++){
+			for (int j = 0; j < n; j++){
 				this->data[i][j] = orig.data[i][j];
+			}
+		}
 	}
 
 public:
@@ -48,9 +49,11 @@ public:
 	Matrix(int n) {
 		this->n = n;
 		init(n);
-		for (int i = 0; i < n; i++)
-			for (int j = 0; j < n; j++)
+		for (int i = 0; i < n; i++){
+			for (int j = 0; j < n; j++){
 				this->data[i][j] = rand();
+			}
+		}
 	}
 
 	Matrix(const Matrix& orig) {
@@ -150,7 +153,6 @@ void main() {
 	ifstream fin("input.txt");
 	ofstream fout("output.txt");
 
-	srand(time(0));
 	int n, k;
 	fin >> n >> k;
 	Matrix a(n), b(n), c(n), d(n);
