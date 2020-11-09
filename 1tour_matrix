@@ -88,7 +88,7 @@ private:
     m_row operator[](const size_t row) const {
 
         if (sizem <= row) {
-         throw std::invalid_argument("Matrix wrong value");
+            throw std::invalid_argument("Matrix wrong value");
         } 
         return { sizem, row, minfo };
     }
