@@ -1,0 +1,297 @@
+#include <math.h>//для деления при означивании
+#include <fstream>
+#include <string>
+#include <string_view>
+#include <cctype>//для isdigit
+#include <memory>
+
+using namespace std;
+
+class Expression {//абстрактный класс выражение
+public:
+	virtual shared_ptr<Expression> derivative(string_view str) = 0;//взятие производной,где str это переменная дифференцирования
+	virtual int eval(string_view str) = 0;//означивание
+	virtual void print(ostream& out) = 0;//вывод выражения в файл
+};
+
+class Number :public Expression
+{
+private:
+
+	const int num;
+
+public:
+
+	Number() : num(0){}
+
+	Number(int n) : num(n) {}
+
+	int eval(string_view str) override {
+		return num;
+	}
+
+	shared_ptr<Expression> derivative(string_view str) override
+	{
+		return shared_ptr<Number> (new Number());//производная от константы - ноль
+	}
+
+	void print(ostream& out) override
+	{
+		out << num;//при выводе числа в выражении скобки не ставятся
+	}
+};
+
+class Variable :public Expression
+{
+private:
+
+	const string var;
+
+public:
+
+	Variable(): var("x"){}
+
+	Variable(string str): var(str){}
+
+	Variable(const Variable& other):var(other.var) {}
+
+	int eval(string_view str) override {
+		if (str.find(var) == -1)
+			throw exception("Неполное означивание");
+
+		string s = var + " <- ";//если это первая переменная в означивании
+		if (str.find(s) != 0)//если есть означивания до этого
+			s = " " + var + " <- ";
+		
+		size_t idx = str.find(s) + var.length() + strlen(" <- ");//индекс первого элемента означивания переменной
+		string asw;//строка - значение переменной
+		for (; str[idx] != ';' && idx < str.length(); idx++) {//пока не упрёмся в конеч строки или...
+			asw += str[idx];//...пока не начнётся означивание следующей переменной
+		}
+		return stoi(asw);
+	}
+
+	shared_ptr<Expression> derivative(string_view str) override
+	{
+		if (var == str)
+			return shared_ptr<Number> (new Number(1));
+		else
+			return shared_ptr<Number> (new Number());
+	}
+
+	void print(ostream& out) override
+	{
+		out << var;
+	}
+};
+
+class Add :public Expression
+{
+private:
+
+	shared_ptr<Expression> left, right;
+
+public:
+
+	Add(): left(nullptr), right(nullptr){}
+
+	Add(shared_ptr<Expression> L1, shared_ptr<Expression> L2) : left(L1), right(L2) {}
+	
+	int eval(string_view str) override {
+		return (left->eval(str) + right->eval(str));
+	}
+
+	shared_ptr<Expression> derivative(string_view str) override
+	{
+		return shared_ptr<Add> (new Add(left->derivative(str), right->derivative(str)));
+	}
+
+	void print(ostream& out) override {
+		out << "(";
+		left->print(out);
+		out << "+";
+		right->print(out);
+		out << ")";
+	}
+};
+
+class Sub :public Expression
+{
+private:
+
+	shared_ptr<Expression> left, right;
+
+public:
+
+	Sub() : left(nullptr), right(nullptr) {}
+
+	Sub(shared_ptr<Expression> L1, shared_ptr<Expression> L2) : left(L1), right(L2) {}
+
+	int eval(string_view str) override {
+		return (left->eval(str) - right->eval(str));
+	}
+
+	shared_ptr<Expression> derivative(string_view str) override
+	{
+		return shared_ptr<Sub> (new Sub(left->derivative(str), right->derivative(str)));
+
+	};
+
+	void print(ostream& out) override {
+		out << "(";
+		left->print(out);
+		out << "-";
+		right->print(out);
+		out << ")";
+	}
+};
+
+class Mul :public Expression
+{
+private:
+
+	shared_ptr<Expression> left, right;
+
+public:
+
+	Mul() : left(nullptr), right(nullptr) {}
+
+	Mul(shared_ptr<Expression> L1, shared_ptr<Expression> L2) : left(L1), right(L2) {}
+
+	int eval(string_view str) override {
+		return (left->eval(str) * right->eval(str));
+	}
+
+	shared_ptr<Expression> derivative(string_view str) override
+	{
+		return shared_ptr<Add> (new Add(shared_ptr<Mul> (new Mul(left->derivative(str), right)), shared_ptr<Mul> (new Mul(left, right->derivative(str)))));
+
+	};
+
+	void print(ostream& out) override {
+		out << "(";
+		left->print(out);
+		out << "*";
+		right->print(out);
+		out << ")";
+	}
+};
+
+class Div :public Expression
+{
+private:
+
+	shared_ptr<Expression> left, right;
+
+public:
+
+	Div() : left(nullptr), right(nullptr) {}
+
+	Div(shared_ptr<Expression> L1, shared_ptr<Expression> L2) : left(L1), right(L2) {}
+
+	int eval(string_view str) override {
+		if (right->eval(str) == 0)
+			throw exception("Деление на Ноль");
+		return (int)(left->eval(str) / right->eval(str));
+	}
+
+	shared_ptr<Expression> derivative(string_view str) override
+	{
+		return shared_ptr<Div> (new Div(shared_ptr<Sub> (new Sub(shared_ptr<Mul> (new Mul(left->derivative(str), right)), shared_ptr<Mul> (new Mul(left, right->derivative(str))))), shared_ptr<Mul> (new Mul(right, right))));
+	};
+
+	void print(ostream& out) override {
+		out << "(";
+		left->print(out);
+		out << ")" << "/" << "(";
+		right->print(out);
+		out << ")";
+	}
+};
+
+enum NumVal {
+	number,
+	value
+};
+
+size_t found(string_view str, size_t* pcount) {//ищет индекс знака операции
+	size_t a = 0, b = 0;
+	int i = 0;
+	if (str[0] != '(') {
+		if (isdigit(str[0]))
+			return NumVal::number;//если передали число
+		return NumVal::value;//если передали переменную
+	}
+	for (; a - b != 1 || str[i] == '('; i++) {//находим место в строке, где начинается сама операция
+		if (str[i] == '(')
+			a++;
+		if (str[i] == ')')
+			b++;
+		
+		if (i == str.length() - 2) {///если мы прошли по всей строке и не остановились
+			///////////////////////////, значит, основную операцию окружает более 1 пары скобок
+			///////////////////////////тогда удаляем одну пару скобок и пытаемся снова
+			str = str.substr(1, str.length() - 2);
+			i = -1;
+			a = 0, b = 0;
+			(*pcount)++;//переменная pcount фиксирует количество лишних пар скобок основного выражения
+		}
+	}//цикл заканчивается, когда до знака операции не остаётся никаких скобок (ничего, переменная или число)
+	for (; str[i] != ')'; i++) {
+		if (str[i] == '+' || str[i] == '-' || str[i] == '*' || str[i] == '/')
+			return i;
+	}//этот цикл просто находит ближайший знак операции
+}
+
+shared_ptr<Expression> scan(string_view str) {
+	size_t count = 0;//сколько лишних пар скобок
+	size_t idx = found(str, &count) + count;
+	string_view s1, s2;
+	if (str.length() > 1){
+		s1 = str.substr(1+count, idx-1-count);////////////////////////тут не всегда 1
+		s2 = str.substr(idx + 1, str.length() - idx - 2 - count);///тут не всегда -2
+	}
+
+	//определяем основной класс выражения по знаку
+	if(idx == NumVal::value)
+		return shared_ptr<Variable> (new Variable(string(str)));
+
+	if (idx == NumVal::number)
+		return shared_ptr<Number> (new Number(stoi(string(str))));
+	
+	if (str[idx] == '+')
+		return shared_ptr<Add> (new Add(scan(string_view(s1)), scan(string_view(s2))));
+
+	if (str[idx] == '-')
+		return shared_ptr<Sub> (new Sub(scan(string_view(s1)), scan(string_view(s2))));
+
+	if (str[idx] == '*')
+		return shared_ptr<Mul> (new Mul(scan(string_view(s1)), scan(string_view(s2))));
+
+	if (str[idx] == '/')
+		return shared_ptr<Div> (new Div(scan(string_view(s1)), scan(string_view(s2))));
+}
+
+
+int main()
+{
+	ifstream fin{ "input.txt" };
+	ofstream fout{ "output.txt" };
+
+	string str;
+	fin >> str;
+	shared_ptr<Expression> i = scan(string_view(str));
+
+	shared_ptr<Expression> di = i->derivative("x");
+	di->print(fout);
+	fout << endl;
+
+	try {
+		//означивание
+	}
+	catch (const exception &error) {
+		fout << "Ошибка: " << error.what();
+	}
+
+	return 0;
+}
