@@ -21,8 +21,8 @@ public:
 
 class Row {
 private:
-	int size;
-	int num;
+	const int size;
+	const int num;
 	int* arr;
 public:
 	Row(int a, int* matrix, int m_size) : size(m_size), num(a), arr(matrix) {}
