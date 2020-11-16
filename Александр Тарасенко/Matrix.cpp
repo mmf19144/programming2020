@@ -6,14 +6,14 @@
 
 class Column {
 private:
-	int size;
-	int num;
+	const int size;
+	const int num;
 	int* arr;
 public:
 	Column(int a, int* matrix, int m_size) : size(m_size), num(a), arr(matrix) {}
 
 	int& operator[](int row) {
-		if (row > size)
+		if (row > size || row < 0)
 			throw ("The index is out of range");
 		return arr[row * size + num];
 	}
@@ -21,14 +21,14 @@ public:
 
 class Row {
 private:
-	int size;
-	int num;
+	const int size;
+	const int num;
 	int* arr;
 public:
 	Row(int a, int* matrix, int m_size) : size(m_size), num(a), arr(matrix) {}
 
 	int& operator[](int col) {
-		if (col > size)
+		if (col > size || row < 0)
 			throw ("The index is out of range");
 		return arr[col + size * num];
 	}
