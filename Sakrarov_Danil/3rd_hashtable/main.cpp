@@ -183,16 +183,18 @@ public:
     }
 
 
-    void del_val(size_t hash_val, const K &delKey) {
+    void del_val(size_t hash_value, const K &delKey) {
 
-        if (table[hash_val].getFilled()) {
-            if (table[hash_val].getKey() == delKey) {
-                table[hash_val].delete_element();
+        size_t iter = hash_value;
+
+        while (table[iter].getFilled()) {
+            if (table[iter].getFilled() && table[iter].getKey() == delKey) {
+                table[iter].delete_element();
                 capacity--;
-                return;
-            } else {
-                del_val(hash_val + 1, delKey);
             }
+            iter++;
+            iter %= size;
+
         }
     }
 
@@ -228,7 +230,8 @@ void start(std::ifstream &fin, const std::string &out) {
 
     HashMap<V, bool> mapOfValues(Table.get_size(), 0); //values as keys for cont unique elements
     for (auto it: Table) {
-        mapOfValues.addElement(it.getValue(), 1);
+        if (it.getFilled())
+            mapOfValues.addElement(it.getValue(), 1);
     }
 
     fout << Table.get_cap() << " " << mapOfValues.get_cap();;
