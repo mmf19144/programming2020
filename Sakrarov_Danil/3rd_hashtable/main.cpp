@@ -47,18 +47,19 @@ public:
 template<typename K, typename V>
 class HashMap {
 private:
-    size_t capacity;
+    size_t capacity=0;
     size_t size;
     Slot<K, V> *table;
 public:
-    HashMap() : size(1000), table(new Slot<K, V>[size]), capacity(0) {
+    HashMap() : size(3), table(new Slot<K, V>[size]) {
     };
 
-    HashMap(size_t new_size, size_t cap) : size(new_size), table(new Slot<K, V>[size]), capacity(cap) {
+    HashMap(size_t new_size) : size(new_size), table(new Slot<K, V>[size]) {
 
     }
 
     ~HashMap() {
+
         delete[] table;
     }
 
@@ -149,17 +150,18 @@ public:
     }
 
     void rehash() {
-        auto *tmp = new Slot<K, V>[size * 2];
-        for (int i = 0; i < size; i++) {
-            tmp[i] = table[i];
+
+
+        auto tmp = HashMap<K, V>(size * 2);
+        for (auto it:*this) {
+            tmp.addElement(it.getKey(), it.getValue());
         }
 
         delete[] table;
-
-        table = tmp;
-        size = size * 2;
-
-
+        size *= 2;
+        table = tmp.table;
+        tmp.table = nullptr;
+        capacity= tmp.capacity;
     }
 
     void add_val(const size_t hash_value, const K &addKey, const V &addValue) {
@@ -228,7 +230,7 @@ void start(std::ifstream &fin, const std::string &out) {
         }
     }
 
-    HashMap<V, bool> mapOfValues(Table.get_size(), 0); //values as keys for cont unique elements
+    HashMap<V, bool> mapOfValues(Table.get_size()); //values as keys for cont unique elements
     for (auto it: Table) {
         if (it.getFilled())
             mapOfValues.addElement(it.getValue(), 1);
