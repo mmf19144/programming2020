@@ -100,8 +100,7 @@ public:
 	//4. Operator =
 
 	Matrix& operator= (const Matrix& that) {
-		if (this != &that) {
-			this->clean();
+		if (this != &that) {	
 			this->copy(that);
 		}
 		return *this;
