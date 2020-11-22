@@ -10,7 +10,10 @@ public:
     int x;
     int y;
 
-    coordinate() {};
+    coordinate() {
+        this->x = -2;
+        this->y = -2;
+    };
     coordinate(int x_, int y_) {
         this->x = x_;
         this->y = y_;
@@ -21,25 +24,23 @@ public:
         else
             return false;
     }
-    static coordinate checkBorder(int N, int M, coordinate s) {
+    void checkBorder(int N, int M) {
 
-        // Выход за границы
-        if (s.x >= N) {
-            s.x = s.x - N;
+        if (this->x >= N) {
+            this->x = this->x - N;
         }
 
-        if (s.y >= M) {
-            s.y = s.y - M;
+        if (this->y >= M) {
+            this->y = this->y - M;
         }
 
-        if (s.x < 0) {
-            s.x = s.x + N;
+        if (this->x < 0) {
+            this->x = this->x + N;
         }
 
-        if (s.y < 0) {
-            s.y = s.y + M;
+        if (this->y < 0) {
+            this->y = this->y + M;
         }
-        return s;
     }
 };
 
@@ -92,6 +93,9 @@ public:
         }
     }
     ~Pole() {
+        for (int i = 0; i < M; i++) {
+            delete[] massive[i];
+        }
         delete[] massive;
     }
     void clear() {
@@ -120,23 +124,22 @@ protected:
         this->age++;
     }
     void checkConstancy() {
-        // Проверка постоянства
         if (this->count_step == this->constancy) {
             this->count_step = 0;
 
             switch (direction) {
-            case up:
-                direction = right;
-                break;
-            case right:
-                direction = down;
-                break;
-            case down:
-                direction = left;
-                break;
-            case left:
-                direction = up;
-                break;
+                case up:
+                    direction = right;
+                    break;
+                case right:
+                    direction = down;
+                    break;
+                case down:
+                    direction = left;
+                    break;
+                case left:
+                    direction = up;
+                    break;
             }
         }
     }
@@ -144,25 +147,29 @@ protected:
         int step = dim_of_step;
 
         switch (this->direction) {
-        case up:
-            this->coordinates.y -= step;
-            break;
-        case right:
-            this->coordinates.x += step;
-            break;
-        case down:
-            this->coordinates.y += step;
-            break;
-        case left:
-            this->coordinates.x -= step;
-            break;
+            case up:
+                this->coordinates.y -= step;
+                break;
+            case right:
+                this->coordinates.x += step;
+                break;
+            case down:
+                this->coordinates.y += step;
+                break;
+            case left:
+                this->coordinates.x -= step;
+                break;
         }
 
-        this->coordinates = coordinate::checkBorder(N, M, this->coordinates);
+        this->coordinates.checkBorder(N, M);
         this->count_step++;
     }
 public:
     Animal() {};
+    virtual void eating(...) {};
+    virtual void reproduction(...) {};
+    virtual void mustDie() {};
+    virtual void iterLoop(...) {};
     coordinate getCoord() {
         return this->coordinates;
     }
@@ -254,7 +261,7 @@ public:
 
 class point_Animal {
 public:
-    char className; // s - shakal, w - wolf, r - rabbit
+    char className;
     int age;
     int order;
     point_Animal(char className, int age, int order) {
@@ -269,7 +276,6 @@ private:
     int statWeak;
     int killstreak;
     static bool compareFuncShakal(int i, int j, const std::vector<Shakal>& Shakals) {
-        //statWeak по возрастанию, Age по убыванию
         if (Shakals[i].statWeak > Shakals[j].statWeak)
             return true;
         else if (Shakals[i].statWeak < Shakals[j].statWeak)
@@ -303,14 +309,11 @@ public:
         return statWeak;
     }
     static void eating(std::vector<Rabbit>& rabbits, std::vector<Wolf>& wolves, std::vector<Shakal>& shakals, Pole& gr_rabbits, Pole& gr_wolves, Pole& gr_shakals) {
-        // Обход по всем шакалам
         for (int i = 0; i < gr_shakals.N; i++)
             for (int j = 0; j < gr_shakals.M; j++) {
 
-                // Если шакалы есть
                 if (gr_shakals.massive[i][j].value) {
 
-                    // Выбираем шакала, который будет есть
                     Shakal* main_shk;
                     int size = gr_shakals.massive[i][j].value;
                     for (int k = 0; k < size; k++)
@@ -325,26 +328,22 @@ public:
 
 
                     std::vector<point_Animal> Animals_in_cell;
-                    // Добавление животных
-                    // Шакалы
+
                     for (int z = 1; z < size; z++) {
                         point_Animal C('s', shakals[gr_shakals.massive[i][j].arr_order[z]].age, gr_shakals.massive[i][j].arr_order[z]);
                         Animals_in_cell.push_back(C);
                     }
-                    //Кролики
                     size = gr_rabbits.massive[i][j].value;
                     for (int z = 0; z < size; z++) {
                         point_Animal C('r', rabbits[gr_rabbits.massive[i][j].arr_order[z]].getAge(), gr_rabbits.massive[i][j].arr_order[z]);
                         Animals_in_cell.push_back(C);
                     }
-                    // Волки
                     size = gr_wolves.massive[i][j].value;
                     for (int z = 0; z < size; z++) {
                         point_Animal C('w', wolves[gr_wolves.massive[i][j].arr_order[z]].getAge(), gr_wolves.massive[i][j].arr_order[z]);
                         Animals_in_cell.push_back(C);
                     }
 
-                    // Сортируем животных по возрасту (Будем есть старых?)
                     size = Animals_in_cell.size();
                     for (int i1 = 0; i1 < size; i1++)
                         for (int j1 = i1 + 1; j1 < size; j1++)
@@ -354,22 +353,20 @@ public:
                                 Animals_in_cell[j1] = support;
                             }
 
-                    // Теперь готовы есть
                     int countFood = 0;
                     int z1 = 0;
                     for (; countFood != 2 || z1 < size;) {
                         main_shk->killstreak++;
-                        // Убиваем животное
                         switch (Animals_in_cell[z1].className) {
-                        case 'r':
-                            rabbits[Animals_in_cell[z1].order].mustDie();
-                            break;
-                        case 'w':
-                            wolves[Animals_in_cell[z1].order].mustDie();
-                            break;
-                        case 's':
-                            shakals[Animals_in_cell[z1].order].mustDie();
-                            break;
+                            case 'r':
+                                rabbits[Animals_in_cell[z1].order].mustDie();
+                                break;
+                            case 'w':
+                                wolves[Animals_in_cell[z1].order].mustDie();
+                                break;
+                            case 's':
+                                shakals[Animals_in_cell[z1].order].mustDie();
+                                break;
                         }
                         z1++;
                         countFood++;
@@ -377,28 +374,13 @@ public:
 
                     if (countFood == 2)
                         main_shk->mustWeak();
-                    /*
-                    обходим всех животных по убыванию старшинства
-                    если попался волк, то мы всех зайцев уничтожаем
-                    если гиена, то можем уничтожить первых двух животных(и не съесть самого себя)
-                    надо быть аккуратным, тк если мы удаляем элемент из вектора, то все предыдущие указатели могут быть перестать быть валидными
-                    хотя возможно и не надо удалять, а просто помечать как убитых
-                    векторы дорогие, если удалять посередине, если мы будем не удалять из середины, а помечать удалённым, то это хорошо :)
-                    удалять из середины не самая быстрая операция и не очень это нужно, а пометки убитых это хайп и вообще флекс
-                    лучше каждый раз обновлять поле(ну мы и так это делаем), чем пытаться модифицировать старое
-                    советует юзать std или unordered map'ы и в качества ключа тратить координаты, а в качестве значения брать вектор всех животных на поле
-                    если вы хоть какое то корректное решение напишите, то будет уже хорошо
-                    ещё раз
-                    берём всех животных сортируем по возрасту идём по списку по убыванию возраста и кормим,
-                    если гиена, берём из этого списка первых двух и помечаем их убитыми
-                    */
                 }
             }
     }
     void reproduction(std::vector<Shakal>& str) {
         if (this->killstreak == 2) {
             str.push_back(Shakal(this->coordinates, this->direction, this->constancy));
-            this->killstreak = 0; // Он опустошился
+            this->killstreak = 0;
         }
     }
     void mustDie() {
@@ -422,7 +404,7 @@ private:
     std::string input_file;
     std::string output_file;
     int count_rabbits,
-        count_wolves;
+            count_wolves;
     int timeSim;
     Field field;
 
@@ -431,8 +413,8 @@ private:
     std::vector<Shakal> vect_shakals;
 
     Pole* ground_rabbits,
-        * ground_wolves,
-        * ground_shakals;
+            * ground_wolves,
+            * ground_shakals;
 public:
     int getCountRab() {
         return count_rabbits;
@@ -501,23 +483,19 @@ public:
     void startSimulation() {
         coordinate z(field.getXdim(), field.getYdim());
         int countRab = vect_rabbit.size(),
-            countWolves = vect_wolf.size();
+                countWolves = vect_wolf.size();
 
         for (int i = 0; i < this->timeSim; i++) {
             countRab = vect_rabbit.size();
             countWolves = vect_wolf.size();
 
-            // Основной проход
+
             updatePole(countWolves, countRab);
             for (int j = 0; j < countRab; j++)
                 vect_rabbit[j].iterLoop(z.x, z.y, vect_rabbit);
             for (int j = 0; j < countWolves; j++)
                 vect_wolf[j].iterLoop(z.x, z.y, vect_rabbit, vect_wolf);
 
-            // Шакалы едят
-            //Shakal::eating(vect_rabbit, vect_wolf, vect_shakals, *ground_rabbits, *ground_wolves, *ground_shakals);
-
-            // Кушаем и размножаемся волками
             updatePole(countWolves, countRab);
             int flag_for_reproduction_wolves = 0;
             for (int i = 0; i < z.y; i++)
@@ -525,7 +503,7 @@ public:
                     if (ground_rabbits->massive[i][j].value * ground_wolves->massive[i][j].value != 0) {
                         flag_for_reproduction_wolves = true;
 
-                        // Сортировка пузырьком
+
                         int size_for_sort = ground_wolves->massive[i][j].arr_order.size();
                         for (int i1 = 0; i < size_for_sort; i1++)
                             for (int j1 = i1 + 1; j1 < size_for_sort; j1++)
@@ -536,26 +514,23 @@ public:
                                     ground_wolves->massive[i][j].arr_order[j1] = support;
                                 }
 
-                        // Старый ест
+
                         int prev_size = vect_wolf.size();
                         vect_wolf[ground_wolves->massive[i][j].arr_order[0]].eating(vect_rabbit);
 
                         ground_wolves->massive[i][j].value = ground_wolves->massive[i][j].value +
-                            vect_wolf.size() - prev_size;
+                                                             vect_wolf.size() - prev_size;
                         ground_rabbits->massive[i][j].value = 0;
                     }
 
             int size = vect_wolf.size();
             for (int i = 0; i < size; i++) {
-                // Делаем размножение, если кого-то съели
                 if (flag_for_reproduction_wolves) {
                     vect_wolf[i].reproduction(vect_wolf);
                 }
-                // Умираем
                 vect_wolf[i].mustDie();
             }
 
-            // Убиваем тех, кто при смерти
             countRab = vect_rabbit.size();
             countWolves = vect_wolf.size();
             for (int j = 0; j < countRab; j++)
@@ -575,7 +550,7 @@ public:
     void printResult() {
         std::ofstream fout("output.txt");
         int N = field.getXdim(),
-            M = field.getYdim();
+                M = field.getYdim();
         updatePole(vect_wolf.size(), vect_rabbit.size());
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < M; j++) {
