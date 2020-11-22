@@ -2,15 +2,13 @@
 #include <fstream>
 #include <map>
 #include <vector>
-#include <iostream>
-#include <fstream>
 
 class RowOfMatrix {
 protected:
     int* arr;
     int dimension;
 public:
-    int getDimension() {
+    int getDimension() const {
         return this->dimension;
     }
     RowOfMatrix() {}
@@ -21,7 +19,7 @@ public:
     ~RowOfMatrix() {
         delete[] arr;
     }
-    int operator[](int number) {
+    int& operator[](int number) {
         number--;
         if (number < 0 || number >= dimension)
             throw std::string("Wrong number");
@@ -36,9 +34,6 @@ public:
     ColumnOfMatrix(int size, int* array) {
         dimension = size;
         arr = array;
-    }
-    ~ColumnOfMatrix() {
-        delete[] arr;
     }
 };
 
@@ -81,17 +76,6 @@ public:
     ~matrix() {
         delete[] memory;
     }
-    matrix(matrix& c1) {
-        this->dimension = c1.dimension;
-        int n = this->dimension;
-        int k = n * n;
-
-
-        this->memory = new int[n * n];
-        for (int i = 0; i < k; i++) {
-            this->memory[i] = c1.memory[i];
-        }
-    }
     matrix(const matrix& c1) {
         this->dimension = c1.dimension;
         int n = this->dimension;
@@ -114,6 +98,7 @@ public:
                     if (!((i == a - 1) || (j == b - 1))) {
                         minorOfMatrix.memory[i_m + minorOfMatrix.dimension * j_m] = this->memory[i + this->dimension * j];
 
+
                         if (j != b - 1)
                             j_m++;
                     }
@@ -126,29 +111,29 @@ public:
         }
         else return NULL;
     }
-    RowOfMatrix operator[](int n) {
+    RowOfMatrix& operator[](int n) {
         n--;
         int size = this->getDimension();
         if (n < 0 || n >= size) throw "Не существует строки с таким номером";
 
-        int* arrayRow = new int[dimension];
+        int** arrayRow = new int* [dimension];
         for (int i = 0; i < dimension; i++)
-            arrayRow[i] = memory[dimension * n + i];
+            arrayRow[i] = &memory[dimension * n + i];
 
-        RowOfMatrix C(dimension, arrayRow);
-        return C;
+        ColumnOfMatrix* c = new ColumnOfMatrix(dimension, *arrayRow);
+        return *c;
     }
-    ColumnOfMatrix operator()(int n) {
+    ColumnOfMatrix& operator()(int n) {
         n--;
         int size = this->getDimension();
         if (n < 0 || n >= size) throw "Не существует строки с таким номером";
 
-        int* arrayCol = new int[dimension];
+        int** arrayCol = new int* [dimension];
         for (int i = 0; i < dimension; i++)
-            arrayCol[i] = memory[dimension * i + n];
+            arrayCol[i] = &memory[dimension * i + n];
 
-        ColumnOfMatrix C(dimension, arrayCol);
-        return C;
+        ColumnOfMatrix* c = new ColumnOfMatrix(dimension, *arrayCol);
+        return *c;
     }
     matrix operator=(matrix c) {
         this->dimension = c.dimension;
@@ -222,9 +207,7 @@ matrix operator-(matrix c1, matrix c2) {
 matrix operator*(matrix c1, matrix c2) {
     if (c1.getDimension() == c2.getDimension()) {
         int size = c1.getDimension();
-        int* a = new int[size] { 0 };
-        matrix result(size, a);
-        delete a;
+        matrix result(size, new int[size] { 0 });
 
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
@@ -272,12 +255,11 @@ matrix operator+(matrix c1) {
 
     return trans;
 }
-
 template<> struct std::hash<matrix> {
     size_t operator()(const matrix& value) {
         size_t hash = 0;
         for (int i = 0; i < pow(value.getDimension(), 2); i++) {
-            hash += pow(std::hash<int>()(value.getDimension()), 2);
+            hash += pow(std::hash<int>()(value.getElement(i)), 2);
         }
         return hash;
     }
@@ -327,40 +309,42 @@ protected:
                 if (find_key == massive[hash_val].getKey())
                     return massive[hash_val].getValue();
                 else {
-                    // В случае коллизии
+
                     hash_val++;
-                    iterOfFind(hash_val, find_key);
+                    return iterOfFind(hash_val, find_key);
                 }
             }
-            else
-                return nullptr;
+            else {
+
+                hash_val++;
+                return iterOfFind(hash_val, find_key);
+            }
         }
         else
-            return nullptr;
+            return NULL;
     }
-    void realloc(const size_t &new_size) {
-        // Выделили память
+    void realloc(const size_t& new_size) {
+
         Cell<K, V>* new_massive = new Cell<K, V>[new_size];
 
-        // Переписываем значения
+
         for (size_t i = 0; i < size; i++)
             new_massive[i] = massive[i];
 
-        // Очистим старую память
+
         delete[] massive;
 
-        // Укажем на новую память и размер
         massive = new_massive;
         size = new_size;
     }
     void iterOfAdd(size_t hash_value, const K& addKey, const V& addValue) {
         if (hash_value >= size) {
-            realloc(hash_value + 1);
+            realloc(hash_value * 2);
         }
 
         if (massive[hash_value].getStatFill()) {
-            // Коллизия
-            if(massive[hash_value].getKey() != addKey)
+
+            if (massive[hash_value].getKey() != addKey)
                 iterOfAdd(hash_value + 1, addKey, addValue);
             else
                 massive[hash_value].setValue(addValue);
@@ -386,6 +370,12 @@ protected:
                 iterOfDel(hash_val + 1, delKey);
             }
         }
+        else {
+            iterOfDel(hash_val + 1, delKey);
+        }
+    }
+    size_t getHash(const K& Key) {
+        return std::hash<K>()(Key) % 997;
     }
 public:
     class Iterator {
@@ -426,7 +416,7 @@ public:
         }
     }
     HashMap() {
-        size = 1000000;
+        size = 1000;
         massive = new Cell<K, V>[size];
         countPairs = 0;
     };
@@ -434,15 +424,15 @@ public:
         delete[] massive;
     }
     V findElement(const K& find_key) {
-        size_t hash_val = std::hash<K>()(find_key) % size;
+        size_t hash_val = getHash(find_key);
         return iterOfFind(hash_val, find_key);
     };
-    void addElement(const K &addKey, const V &addValue) {
-        size_t hash_value = std::hash<K>()(addKey) % size;
+    void addElement(const K& addKey, const V& addValue) {
+        size_t hash_value = getHash(addKey);
         iterOfAdd(hash_value, addKey, addValue);
     };
-    void delElement(const K &delKey) {
-        size_t hash_val = std::hash<K>()(delKey) % size;
+    void delElement(const K& delKey) {
+        size_t hash_val = getHash(delKey);
         iterOfDel(hash_val, delKey);
     };
     size_t* getMainInfo() {
@@ -489,7 +479,7 @@ private:
         if (hash_val < this->size) {
             for (; hash_val != this->size;) {
                 if (this->massive[hash_val].getStatFill() == true) {
-                    if(this->massive[hash_val].getKey() == findKey)
+                    if (this->massive[hash_val].getKey() == findKey)
                         support.push_back(this->massive[hash_val]);
                 }
                 hash_val++;
@@ -521,7 +511,7 @@ private:
 };
 
 template <typename K, typename V>
-void startProgram(std::ifstream &fin, const std::string &out) {
+void startProgram(std::ifstream& fin, const std::string& out) {
     std::ofstream fout(out);
     HashMap<K, V> Table;
     size_t countLoop;
@@ -542,6 +532,13 @@ void startProgram(std::ifstream &fin, const std::string &out) {
         if (operation == 'R') {
             fin >> key;
             Table.delElement(key);
+            continue;
+        }
+        if (operation == 'F') {
+            fin >> key;
+
+            V c = Table.findElement(key);
+            std::cout << c << std::endl;
             continue;
         }
     }
