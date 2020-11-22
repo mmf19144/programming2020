@@ -6,7 +6,7 @@ protected:
     int* arr;
     int dimension;
 public:
-    int getDimension() {
+    int getDimension() const {
         return this->dimension;
     }
     RowOfMatrix() {}
@@ -17,7 +17,7 @@ public:
     ~RowOfMatrix() {
         delete[] arr;
     }
-    int operator[](int number) {
+    int& operator[](int number) {
         number--;
         if (number < 0 || number >= dimension)
             throw std::string("Wrong number");
@@ -32,9 +32,6 @@ public:
     ColumnOfMatrix(int size, int* array) {
         dimension = size;
         arr = array;
-    }
-    ~ColumnOfMatrix() {
-        delete[] arr;
     }
 };
 
@@ -73,17 +70,6 @@ public:
     ~matrix() {
         delete[] memory;
     }
-    matrix(matrix& c1) {
-        this->dimension = c1.dimension;
-        int n = this->dimension;
-        int k = n * n;
-
-
-        this->memory = new int[n * n];
-        for (int i = 0; i < k; i++) {
-            this->memory[i] = c1.memory[i];
-        }
-    }
     matrix(const matrix& c1) {
         this->dimension = c1.dimension;
         int n = this->dimension;
@@ -118,29 +104,29 @@ public:
         }
         else return NULL;
     }
-    RowOfMatrix operator[](int n) {
+    RowOfMatrix& operator[](int n) {
         n--;
         int size = this->getDimension();
-        if (n < 0 || n >= size) throw "Не существует строки с таким номером";
+        if (n < 0 || n >= size) throw "РќРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ СЃС‚СЂРѕРєРё СЃ С‚Р°РєРёРј РЅРѕРјРµСЂРѕРј";
 
-        int* arrayRow = new int[dimension];
+        int** arrayRow = new int* [dimension];
         for (int i = 0; i < dimension; i++)
-            arrayRow[i] = memory[dimension * n + i];
+            arrayRow[i] = &memory[dimension * n + i];
 
-        RowOfMatrix C(dimension, arrayRow);
-        return C;
+        ColumnOfMatrix* c = new ColumnOfMatrix(dimension, *arrayRow);
+        return *c;
     }
-    ColumnOfMatrix operator()(int n) {
+    ColumnOfMatrix& operator()(int n) {
         n--;
         int size = this->getDimension();
-        if (n < 0 || n >= size) throw "Не существует строки с таким номером";
+        if (n < 0 || n >= size) throw "РќРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ СЃС‚СЂРѕРєРё СЃ С‚Р°РєРёРј РЅРѕРјРµСЂРѕРј";
 
-        int* arrayCol = new int[dimension];
+        int** arrayCol = new int* [dimension];
         for (int i = 0; i < dimension; i++)
-            arrayCol[i] = memory[dimension * i + n];
+            arrayCol[i] = &memory[dimension * i + n];
 
-        ColumnOfMatrix C(dimension, arrayCol);
-        return C;
+        ColumnOfMatrix* c = new ColumnOfMatrix(dimension, *arrayCol);
+        return *c;
     }
     matrix operator=(matrix c) {
         this->dimension = c.dimension;
@@ -193,7 +179,7 @@ matrix operator+(matrix c1, matrix c2) {
         }
         return result;
     }
-    throw std::string("Сложение матриц разного размера!");
+    throw std::string("РЎР»РѕР¶РµРЅРёРµ РјР°С‚СЂРёС† СЂР°Р·РЅРѕРіРѕ СЂР°Р·РјРµСЂР°!");
 }
 
 matrix operator-(matrix c1, matrix c2) {
@@ -208,15 +194,13 @@ matrix operator-(matrix c1, matrix c2) {
         }
         return result;
     }
-    throw std::string("Вычитание матриц разного размера!");
+    throw std::string("Р’С‹С‡РёС‚Р°РЅРёРµ РјР°С‚СЂРёС† СЂР°Р·РЅРѕРіРѕ СЂР°Р·РјРµСЂР°!");
 }
 
 matrix operator*(matrix c1, matrix c2) {
     if (c1.getDimension() == c2.getDimension()) {
         int size = c1.getDimension();
-        int* a = new int[size] { 0 };
-        matrix result(size, a);
-        delete a;
+        matrix result(size, new int[size] { 0 });
 
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
@@ -227,7 +211,7 @@ matrix operator*(matrix c1, matrix c2) {
         }
         return result;
     }
-    throw std::string("Умножение матриц разного размера!");
+    throw std::string("РЈРјРЅРѕР¶РµРЅРёРµ РјР°С‚СЂРёС† СЂР°Р·РЅРѕРіРѕ СЂР°Р·РјРµСЂР°!");
 }
 
 bool operator==(matrix c1, matrix c2) {
@@ -240,7 +224,7 @@ bool operator==(matrix c1, matrix c2) {
 
         return true;
     }
-    throw std::string("Сравнение матриц разного размера!");
+    throw std::string("РЎСЂР°РІРЅРµРЅРёРµ РјР°С‚СЂРёС† СЂР°Р·РЅРѕРіРѕ СЂР°Р·РјРµСЂР°!");
 }
 
 bool operator!=(matrix c1, matrix c2) {
@@ -251,7 +235,7 @@ bool operator!=(matrix c1, matrix c2) {
 matrix operator+(matrix c1) {
     int size = c1.getDimension();
     if (size == 0)
-        throw std::string("Транспонирование матрицы нулевого размера!");
+        throw std::string("РўСЂР°РЅСЃРїРѕРЅРёСЂРѕРІР°РЅРёРµ РјР°С‚СЂРёС†С‹ РЅСѓР»РµРІРѕРіРѕ СЂР°Р·РјРµСЂР°!");
 
     int* a = new int[size] { 0 };
     matrix trans(size, a);
