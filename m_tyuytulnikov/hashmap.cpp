@@ -175,8 +175,6 @@ public:
 
     void insert(Key &key, Value &val) {
         size_t hash = calcHash(key);
-        if (data[hash].search({key, val}))
-            return;
 
         data[hash].pushFront({key, val});
         capacity++;
@@ -239,7 +237,6 @@ public:
     vector<Value> getAllValuesByKey(Key &key) {
 
         size_t hash = calcHash(key);
-        size_t count = getNumOfElements(key);
         vector<Value> val_vec;
         for (auto iter = data[hash].begin(); iter != data[hash].end(); ++iter) {
             if ((*iter).first == key) {
@@ -266,6 +263,12 @@ public:
 
     public:
         Iterator() = default;
+
+        Iterator(LinkedList<pair<Key, Value>> *cur, LinkedList<pair<Key, Value>> *end){
+            cur_list = cur;
+            end_list = end;
+            list_iter = cur_list->begin();
+        }
 
         pair<Key, Value> &operator*() {
             assert(!list_iter.isNull());
@@ -295,19 +298,18 @@ public:
         }
 
         bool operator==(Iterator const &that) const {
-            if (cur_list == end_list && that.cur_list == end_list) {
-                return true;
-            }
-            return (this->list_iter == that.list_iter);
+            return !(*this!=that);
+//            if (cur_list == end_list && that.cur_list == end_list) {
+//                return true;
+//            }
+//            return (this->list_iter == that.list_iter);
         }
     };
 
     Iterator begin() {
         if (capacity == 0)
             return end();
-        Iterator it;
-        it.cur_list = data;
-        it.end_list = &data[size];
+        Iterator it (data, &data[size]);
         while (it.cur_list->isNull()) {
             it.cur_list++;
         }
@@ -316,8 +318,7 @@ public:
     }
 
     Iterator end() {
-        Iterator it;
-        it.cur_list = &data[size];
+        Iterator it (&data[size], &data[size]);
         return it;
     }
 
@@ -328,9 +329,10 @@ public:
     size_t countUniqueValues() {
         if (countValues() == 0)
             return 0;
-        HashMap<Value, Value> map(size, rehash_value);
+        HashMap<Value, char> map(size, rehash_value);
         for (auto iter = this->begin(); iter != this->end(); ++iter) {
-            map.insert((*iter).second, (*iter).second);
+            char m = 0;
+            map.replace((*iter).second, m);
         }
         return map.countValues();
     }
