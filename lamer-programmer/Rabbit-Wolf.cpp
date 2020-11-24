@@ -30,6 +30,8 @@ public:
 	virtual void move(size_t N, size_t M) = 0;
 	virtual bool breed() = 0;
 	virtual bool isCorpse() const = 0;
+	virtual ~IAnimal()
+	{	}
 };
 
 
