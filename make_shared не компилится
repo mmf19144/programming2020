@@ -57,9 +57,9 @@ public:
 	Variable(const Variable& other):var(other.var) {}
 
 	int eval(string_view str) override {
-		if (str.find(var) == -1)
-			throw exception("Неполное означивание");
-
+		if (str.find(var + " ") != 0 || str.find(" " + var + " ") == -1)//если эта переменная не означивается первой
+			throw exception("Неполное означивание");//////////////////////или в другом месте строки означивания
+		
 		string s = var + " <- ";//если это первая переменная в означивании
 		if (str.find(s) != 0)//если есть означивания до этого
 			s = " " + var + " <- ";
