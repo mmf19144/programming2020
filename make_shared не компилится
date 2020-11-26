@@ -255,22 +255,22 @@ shared_ptr<Expression> scan(string_view str) {
 
 	//определяем основной класс выражения по знаку
 	if(idx == NumVal::value)
-		return shared_ptr<Variable> (new Variable(string(str)));
+		return make_shared<Variable> (string(str));
 
 	if (idx == NumVal::number)
-		return shared_ptr<Number> (new Number(stoi(string(str))));
+		return make_shared<Number> (stoi(string(str)));
 	
 	if (str[idx] == '+')
-		return shared_ptr<Add> (new Add(scan(string_view(s1)), scan(string_view(s2))));
+		return make_shared<Add> (scan(string_view(s1)), scan(string_view(s2)));
 
 	if (str[idx] == '-')
-		return shared_ptr<Sub> (new Sub(scan(string_view(s1)), scan(string_view(s2))));
+		return make_shared<Sub> (scan(string_view(s1)), scan(string_view(s2)));
 
 	if (str[idx] == '*')
-		return shared_ptr<Mul> (new Mul(scan(string_view(s1)), scan(string_view(s2))));
+		return make_shared<Mul> (scan(string_view(s1)), scan(string_view(s2)));
 
 	if (str[idx] == '/')
-		return shared_ptr<Div> (new Div(scan(string_view(s1)), scan(string_view(s2))));
+		return make_shared<Div> (scan(string_view(s1)), scan(string_view(s2)));
 }
 
 
