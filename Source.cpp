@@ -22,7 +22,7 @@ Element<K, V>* get_el(K key, V value) {
 
 template <typename K, typename V>
 class HashMap {
-protected:
+private:
 	friend class Iterator;
 	Element<K, V>** table;
 	unsigned int h_size = 13;
