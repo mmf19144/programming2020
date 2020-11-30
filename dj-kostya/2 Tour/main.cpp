@@ -3,14 +3,18 @@
 #include <cstring>
 #include <vector>
 #include <algorithm>
+#include <map>
 
-#define HYENA_AVAILABLE
+//#define DEBUG
+
+//#define HYENA_AVAILABLE
 #ifdef HYENA_AVAILABLE
 #define ANIMAL_CNT 3
 #else
 #define ANIMAL_CNT 2
 #endif
 
+#define Point std::pair<size_t , size_t>
 enum class MovRotation {
     UP, RIGHT, DOWN, LEFT
 };
@@ -19,11 +23,6 @@ enum class AnimalType {
     Rabbit, Wolf, Hyena
 };
 
-
-typedef struct sPoint {
-    size_t x;
-    size_t y;
-} Point;
 
 class IAnimal {
 public:
@@ -41,9 +40,11 @@ public:
 
     virtual bool is_dead() = 0;
 
-    virtual bool must_multiply() = 0;
+    virtual IAnimal *multiply() = 0;
 
     virtual AnimalType get_animal_type() = 0;
+
+    virtual bool kill(IAnimal *an) = 0;
 
     virtual bool can_kill() const {
         return false;
@@ -56,14 +57,11 @@ class Simulation {
     size_t cur_step = 0;
     const size_t max_steps = 0;
     std::vector<IAnimal *> animals;
-    std::vector<std::vector<std::vector<IAnimal *>>> field;
+    std::map<std::pair<size_t, size_t>, std::vector<IAnimal *>> field;
 public:
 
     Simulation(const size_t height_, const size_t width_, const size_t max_step) : height(height_), width(width_),
                                                                                    max_steps(max_step) {
-        field.resize(height_);
-        for (int i = 0; i < height_; i++)
-            field[i].resize(width_);
     }
 
     size_t get_new_id() const {
@@ -89,7 +87,7 @@ public:
     void spawn_animal(IAnimal *animal) {
         animals.push_back(animal);
         Point pos = animal->get_pos();
-        field[pos.y][pos.x].push_back(animal);
+        field[pos].push_back(animal);
     }
 
     void step();
@@ -99,21 +97,32 @@ public:
             for (size_t x = 0; x < m.width; x++) {
 
                 int size = 0;
-                for (auto j : m.field[y][x]) {
-                    switch (j->get_animal_type()) {
 
-                        case AnimalType::Rabbit:
-                            size++;
-                            break;
-                        case AnimalType::Wolf:
-                        case AnimalType::Hyena:
-                            size--;
-                            break;
+
+                auto curPos = m.field.find(Point(y, x));
+                if (curPos == m.field.end()) {
+                    os << "#";
+                } else {
+                    for (auto j : curPos->second) {
+                        switch (j->get_animal_type()) {
+
+                            case AnimalType::Rabbit:
+                                size++;
+                                break;
+                            case AnimalType::Wolf:
+                            case AnimalType::Hyena:
+                                size--;
+                                break;
+                        }
+
                     }
-
+                    if (size == 0)
+                        os << "#";
+                    else
+                        os << size;
                 }
-                if (size == 0) os << '#';
-                else os << size;
+
+
             }
             if (y < m.height - 1)
                 os << std::endl;
@@ -125,7 +134,11 @@ public:
 
     void run() {
         for (int s = 0; s < max_steps; s++) {
+#ifdef DEBUG
+            std::cout << *this << std::endl << std::endl;
+#endif
             step();
+
         }
 
     }
@@ -134,8 +147,8 @@ public:
 
 class BaseAnimal : public IAnimal {
 
-    size_t x;
-    size_t y;
+    int x;
+    int y;
     const size_t speed;
 
     const size_t max_age;
@@ -145,29 +158,30 @@ class BaseAnimal : public IAnimal {
 
 
 protected:
+    Simulation &sim;
     const bool is_root_parent;
     const size_t id;
     const size_t parent_id;
-    Simulation &sim;
+
     const size_t birth_step;
     bool is_die;
     size_t age = 0;
 
 public:
 
-    BaseAnimal(BaseAnimal *parent, Simulation &sim_) : id(sim_.get_new_id()),
-                                                       parent_id(parent->id),
-                                                       x(parent->x),
-                                                       y(parent->y),
-                                                       sim(sim_),
-                                                       birth_step(sim_.get_current_step()),
-                                                       constancy(parent->constancy),
-                                                       rot(parent->rot),
-                                                       is_die(false),
-                                                       speed(parent->speed),
-                                                       max_age(parent->max_age),
-                                                       is_root_parent(false),
-                                                       type(parent->type) {}
+    explicit BaseAnimal(BaseAnimal *parent) : id(sim.get_new_id()),
+                                              parent_id(parent->id),
+                                              x(parent->x),
+                                              y(parent->y),
+                                              sim(parent->sim),
+                                              birth_step(sim.get_current_step()),
+                                              constancy(parent->constancy),
+                                              rot(parent->rot),
+                                              is_die(false),
+                                              speed(parent->speed),
+                                              max_age(parent->max_age),
+                                              is_root_parent(false),
+                                              type(parent->type) {}
 
     BaseAnimal(size_t x_,
                size_t y_,
@@ -191,7 +205,7 @@ public:
                                    type(type_) {}
 
     Point get_pos() override {
-        return {x, y};
+        return {y, x};
     }
 
     Point move() override {
@@ -209,10 +223,15 @@ public:
                 x -= speed;
                 break;
         }
-        x += sim.get_width();
-        x %= sim.get_width();
-        y += sim.get_height();
-        y %= sim.get_height();
+        if (x < 0)
+            x += sim.get_width();
+        else if (x >= sim.get_width())
+            x -= sim.get_width();
+        if (y < 0)
+            y += sim.get_height();
+        else if (y >= sim.get_height())
+            y -= sim.get_height();
+
         if ((sim.get_current_step() - birth_step) > 0 && (sim.get_current_step() - birth_step) % constancy == 0) {
             switch (rot) {
                 case MovRotation::UP: {
@@ -284,14 +303,21 @@ class Rabbit : public BaseAnimal {
 private:
     const size_t reproduction_step = 5;
 public:
-    Rabbit(BaseAnimal *parent, Simulation &sim_) : BaseAnimal(parent, sim_) {}
+    Rabbit(BaseAnimal *parent) : BaseAnimal(parent) {}
 
     Rabbit(size_t x_, size_t y_, MovRotation start_rot, const size_t constancy_, Simulation &sim_) :
             BaseAnimal(x_, y_, start_rot, constancy_, 1, 10, AnimalType::Rabbit, sim_) {}
 
-    bool must_multiply() override {
-        return !is_die && age % reproduction_step == 0 &&
-               age != 0;
+
+    bool kill(IAnimal *an) override {
+        return false;
+    }
+
+    IAnimal *multiply() override {
+        if (!is_die && age % reproduction_step == 0 && age != 0)
+            return new Rabbit(this);
+        else
+            return nullptr;
     }
 
 
@@ -306,29 +332,37 @@ protected:
             BaseAnimal(x_, y_, start_rot, constancy_, 2, 10, anim_type, sim_) {}
 
 public:
-    Wolf(BaseAnimal *parent, Simulation &sim_) : BaseAnimal(parent, sim_) {}
+    Wolf(BaseAnimal *parent) : BaseAnimal(parent) {}
 
     Wolf(size_t x_, size_t y_, MovRotation start_rot, const size_t constancy_, Simulation &sim_) :
             BaseAnimal(x_, y_, start_rot, constancy_, 2, 10, AnimalType::Wolf, sim_) {}
 
-    bool must_multiply() override {
-        return !is_die && kills >= reproduction_kills;
-    }
-
-    void reset_kills() {
-        if (!is_die && kills == reproduction_kills)
+    IAnimal *multiply() override {
+        if (!is_die && kills >= reproduction_kills) {
             kills = 0;
+            return new Wolf(this);
+        } else
+            return nullptr;
     }
 
-    void kill() {
-        kills++;
+    bool kill(IAnimal *an) override {
+        switch (an->get_animal_type()) {
+            case AnimalType::Rabbit: {
+                an->dying();
+                kills++;
+                return true;
+            }
+
+            case AnimalType::Wolf:
+            case AnimalType::Hyena:
+                return false;
+        }
     }
 
     bool can_kill() const override {
         return true;
     }
 };
-
 
 class Hyena : public Wolf {
 private:
@@ -338,22 +372,37 @@ public:
     Hyena(size_t x_, size_t y_, MovRotation start_rot, const size_t constancy_, Simulation &sim_) :
             Wolf(x_, y_, start_rot, constancy_, sim_, AnimalType::Hyena) {}
 
-    Hyena(BaseAnimal *parent, Simulation &sim_) : Wolf(parent, sim_) {}
+    Hyena(BaseAnimal *parent) : Wolf(parent) {}
 
-    void reset_kill() {
-        if (!is_die && kills == reproduction_kills) {
+    IAnimal *multiply() override {
+        if (!is_die && kills >= reproduction_kills) {
             kills = 0;
             can_kill_ = false;
-        }
+            return new Wolf(this);
+        } else
+            return nullptr;
+    }
+
+//    void reset_kill() {
+//        if (!is_die && kills == reproduction_kills) {
+//            kills = 0;
+//            can_kill_ = false;
+//        }
+//    }
+    bool kill(IAnimal *an) override {
+        an->dying();
+        kills++;
+        return true;
     }
 
     bool can_kill() const override {
-        return kills < reproduction_kills;
+        return can_kill_ && kills < reproduction_kills;
     }
 
 };
 
 void Simulation::step() {
+
     cur_step++;
     // moving
     for (auto *animal: animals) {
@@ -361,110 +410,66 @@ void Simulation::step() {
             continue;
         Point old_position = animal->get_pos();
 
-        for (int i = 0; i < field[old_position.y][old_position.x].size(); i++) {
-            if (field[old_position.y][old_position.x][i] == animal) {
-                field[old_position.y][old_position.x].erase(field[old_position.y][old_position.x].begin() + i);
+        for (int i = 0; i < field[old_position].size(); i++) {
+            if (field[old_position][i] == animal) {
+                field[old_position].erase(field[old_position].begin() + i);
                 break;
             }
         }
         Point new_pos = animal->move();
-        field[new_pos.y][new_pos.x].push_back(animal);
+        field[new_pos].push_back(animal);
     }
     // eating
-    for (int x = 0; x < width; x++) {
-        for (int y = 0; y < height; y++) {
-            while (true) {
-                size_t field_size = field[y][x].size();
-                if (!field_size || field_size == 1) break;
-                sort(field[y][x].begin(), field[y][x].end(), [](const IAnimal *lhs, const IAnimal *rhs) {
-                    return *(BaseAnimal *) rhs < *(BaseAnimal *) lhs;
-                });
-                BaseAnimal *oldest_animal = nullptr;
-                bool has_hungry_animal = false;
-                for (int j = 0; j < field_size; j++) {
-                    if (field[y][x][j]->selectedInStep == cur_step) continue;
-                    switch (field[y][x][j]->get_animal_type()) {
-                        case AnimalType::Rabbit: {
-                            has_hungry_animal = false;
-                        }
-                        case AnimalType::Hyena:
-                        case AnimalType::Wolf: {
-                            if (field[y][x][j]->can_kill()) {
-                                oldest_animal = (BaseAnimal *) field[y][x][j];
-                                has_hungry_animal = true;
-                            } else {
-                                has_hungry_animal = false;
-                            }
-                        }
-                    }
-                    if (has_hungry_animal) break;
-                }
-                if (oldest_animal == nullptr)
+
+    for (const auto &curPos: field) {
+        sort(field[curPos.first].begin(), field[curPos.first].end(), [](const IAnimal *lhs, const IAnimal *rhs) {
+            return *(BaseAnimal *) rhs < *(BaseAnimal *) lhs;
+        });
+        bool has_kill = true;
+        while (has_kill) {
+            has_kill = false;
+            IAnimal *oldestAnimal = nullptr;
+            for (auto animal: curPos.second) {
+                if (animal->selectedInStep == cur_step) continue;
+                if (animal->can_kill()) {
+                    oldestAnimal = animal;
                     break;
-                oldest_animal->selectedInStep = cur_step;
-                bool has_kill = false;
-                for (int j = 0; j < field[y][x].size(); j++) {
-                    if (oldest_animal == field[y][x][j]) continue;
-                    if (!oldest_animal->can_kill()) break;
-                    switch (oldest_animal->get_animal_type()) {
-                        case AnimalType::Rabbit:
-                            break;
-                        case AnimalType::Wolf: {
-                            if (field[y][x][j]->get_animal_type() == AnimalType::Rabbit) {
-                                field[y][x][j]->dying();
-                                field[y][x].erase(field[y][x].begin() + j);
-                                j--;
-                                ((Wolf *) oldest_animal)->kill();
-                                has_kill = true;
-                            }
-                            break;
-                        }
-
-                        case AnimalType::Hyena: {
-
-                            field[y][x][j]->dying();
-                            field[y][x].erase(field[y][x].begin() + j);
-                            j--;
-                            ((Hyena *) oldest_animal)->kill();
-                            has_kill = true;
-
-                            break;
-                        }
-                    }
                 }
-                if (!has_kill) break;
             }
+            if (!oldestAnimal)
+                continue;
 
+            oldestAnimal->selectedInStep = cur_step;
+            for (auto i : curPos.second) {
+                if (oldestAnimal == i)
+                    continue;
+                if (!oldestAnimal->can_kill())
+                    break;
+
+                if (oldestAnimal->kill(i)) {
+                    field[curPos.first].erase(std::find(field[curPos.first].begin(), field[curPos.first].end(), i));
+                    has_kill = true;
+                }
+            }
         }
+
     }
+
+
     // aging and multiplying
     for (auto *animal: animals) {
         if (animal->is_dead()) continue;
         animal->aging();
-        if (animal->must_multiply()) {
-            switch (animal->get_animal_type()) {
-                case AnimalType::Rabbit: {
-                    spawn_animal(new Rabbit((BaseAnimal *) animal, *this));
-                    break;
-                }
-                case AnimalType::Wolf: {
-                    spawn_animal(new Wolf((BaseAnimal *) animal, *this));
-                    ((Wolf *) animal)->reset_kills();
-                    break;
-                }
-                case AnimalType::Hyena: {
-                    spawn_animal(new Hyena((BaseAnimal *) animal, *this));
-                    ((Hyena *) animal)->reset_kills();
-                    break;
-                }
-            }
-        }
+        IAnimal *children = animal->multiply();
+        if (children)
+            spawn_animal(children);
+
         // dying
         if (animal->must_die()) {
             Point old_position = animal->get_pos();
-            for (int i = 0; i < field[old_position.y][old_position.x].size(); i++) {
-                if (field[old_position.y][old_position.x][i] == animal) {
-                    field[old_position.y][old_position.x].erase(field[old_position.y][old_position.x].begin() + i);
+            for (int i = 0; i < field[old_position].size(); i++) {
+                if (field[old_position][i] == animal) {
+                    field[old_position].erase(field[old_position].begin() + i);
                     break;
                 }
             }
