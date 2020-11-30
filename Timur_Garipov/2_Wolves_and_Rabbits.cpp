@@ -26,6 +26,7 @@ public:
     }
     void checkBorder(int N, int M) {
 
+
         if (this->x >= N) {
             this->x = this->x - N;
         }
@@ -124,6 +125,7 @@ protected:
         this->age++;
     }
     void checkConstancy() {
+
         if (this->count_step == this->constancy) {
             this->count_step = 0;
 
@@ -166,10 +168,7 @@ protected:
     }
 public:
     Animal() {};
-    virtual void eating(...) {};
-    virtual void reproduction(...) {};
     virtual void mustDie() {};
-    virtual void iterLoop(...) {};
     coordinate getCoord() {
         return this->coordinates;
     }
@@ -182,6 +181,7 @@ public:
     int getStatDie() {
         return statDie;
     }
+    virtual ~Animal() {};
 };
 
 class Rabbit : public Animal {
@@ -201,7 +201,7 @@ public:
             str.push_back(Rabbit(this->coordinates, this->direction, this->constancy));
         }
     }
-    void mustDie() {
+    void mustDie() override {
         if (this->age == 10) {
             statDie = 1;
         }
@@ -248,7 +248,7 @@ public:
         }
 
     }
-    void mustDie() {
+    void mustDie() override {
         if (this->age == 15) {
             statDie = 1;
         }
@@ -276,6 +276,7 @@ private:
     int statWeak;
     int killstreak;
     static bool compareFuncShakal(int i, int j, const std::vector<Shakal>& Shakals) {
+
         if (Shakals[i].statWeak > Shakals[j].statWeak)
             return true;
         else if (Shakals[i].statWeak < Shakals[j].statWeak)
@@ -309,10 +310,13 @@ public:
         return statWeak;
     }
     static void eating(std::vector<Rabbit>& rabbits, std::vector<Wolf>& wolves, std::vector<Shakal>& shakals, Pole& gr_rabbits, Pole& gr_wolves, Pole& gr_shakals) {
+
         for (int i = 0; i < gr_shakals.N; i++)
             for (int j = 0; j < gr_shakals.M; j++) {
 
+
                 if (gr_shakals.massive[i][j].value) {
+
 
                     Shakal* main_shk;
                     int size = gr_shakals.massive[i][j].value;
@@ -333,16 +337,19 @@ public:
                         point_Animal C('s', shakals[gr_shakals.massive[i][j].arr_order[z]].age, gr_shakals.massive[i][j].arr_order[z]);
                         Animals_in_cell.push_back(C);
                     }
+
                     size = gr_rabbits.massive[i][j].value;
                     for (int z = 0; z < size; z++) {
                         point_Animal C('r', rabbits[gr_rabbits.massive[i][j].arr_order[z]].getAge(), gr_rabbits.massive[i][j].arr_order[z]);
                         Animals_in_cell.push_back(C);
                     }
+
                     size = gr_wolves.massive[i][j].value;
                     for (int z = 0; z < size; z++) {
                         point_Animal C('w', wolves[gr_wolves.massive[i][j].arr_order[z]].getAge(), gr_wolves.massive[i][j].arr_order[z]);
                         Animals_in_cell.push_back(C);
                     }
+
 
                     size = Animals_in_cell.size();
                     for (int i1 = 0; i1 < size; i1++)
@@ -353,10 +360,12 @@ public:
                                 Animals_in_cell[j1] = support;
                             }
 
+
                     int countFood = 0;
                     int z1 = 0;
                     for (; countFood != 2 || z1 < size;) {
                         main_shk->killstreak++;
+
                         switch (Animals_in_cell[z1].className) {
                             case 'r':
                                 rabbits[Animals_in_cell[z1].order].mustDie();
@@ -383,7 +392,7 @@ public:
             this->killstreak = 0;
         }
     }
-    void mustDie() {
+    void mustDie() override {
         if (this->age == 15) {
             statDie = 1;
         }
@@ -496,6 +505,7 @@ public:
             for (int j = 0; j < countWolves; j++)
                 vect_wolf[j].iterLoop(z.x, z.y, vect_rabbit, vect_wolf);
 
+
             updatePole(countWolves, countRab);
             int flag_for_reproduction_wolves = 0;
             for (int i = 0; i < z.y; i++)
@@ -525,11 +535,14 @@ public:
 
             int size = vect_wolf.size();
             for (int i = 0; i < size; i++) {
+
                 if (flag_for_reproduction_wolves) {
                     vect_wolf[i].reproduction(vect_wolf);
                 }
+
                 vect_wolf[i].mustDie();
             }
+
 
             countRab = vect_rabbit.size();
             countWolves = vect_wolf.size();
