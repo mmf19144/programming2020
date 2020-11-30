@@ -1,0 +1,716 @@
+#define _CRT_SECURE_NO_WARNINGS
+
+#include <iostream>
+#include <fstream>
+#include <cstring>
+#include <unordered_map>
+#include <cassert>
+#include <vector>
+
+
+using namespace std;
+
+//matrix
+
+class Column {
+    const size_t id_column;
+    const size_t sizem;
+    int* const minfo;
+public:
+    Column(const size_t idx, const size_t size, int* const data)
+        : id_column(idx), sizem(size), minfo(data) {
+    }
+
+    int& operator[](size_t id_row) {
+        if (id_row > sizem || id_row < 1) {
+            throw std::invalid_argument("Invalid row index");
+        }
+        id_row--;
+
+        return minfo[id_row * sizem + id_column];
+    }
+
+    friend std::ostream& operator<<(std::ostream& stream, const Column& column) {
+        for (size_t i = 0; i < column.sizem; i++) {
+            stream << column.minfo[i * column.sizem + column.id_column];
+            if (i + 1 == column.sizem)
+                break;
+            stream << " ";
+        }
+        return stream;
+    }
+};
+
+class Row {
+    const size_t id_row;
+    const size_t sizem;
+    int* const minfo;
+
+public:
+    Row(const size_t idx, const size_t size, int* const data)
+        : id_row(idx), sizem(size), minfo(data) {
+    }
+
+    int& operator[](size_t id_column) {
+        if (id_column > sizem || id_column < 1) {
+            throw std::invalid_argument("Invalid column index");
+        }
+        id_column--;
+
+        return minfo[id_row * sizem + id_column];
+    }
+
+    friend std::ostream& operator<<(std::ostream& stream, const Row& row) {
+        for (size_t i = 0; i < row.sizem; i++) {
+            stream << row.minfo[row.id_row * row.sizem + i];
+            if (i + 1 == row.sizem)
+                break;
+            stream << " ";
+        }
+        return stream;
+    }
+};
+
+class Matrix {
+public:
+    const size_t sizem;
+private:
+    int* const minfo;
+
+
+public:
+
+    Matrix()
+        : sizem(0), minfo(nullptr) {
+    }
+
+    explicit Matrix(const size_t size)
+        : sizem(size), minfo(new int[sizem * sizem]()) {
+        memset(minfo, 0, sizem * sizem * sizeof(int));
+        for (size_t i = 0; i < sizem * sizem; i += (sizem + 1)) {
+            minfo[i] = 1;
+        }
+    }
+
+    Matrix(const size_t size, const int* arr)
+        : sizem(size), minfo(new int[sizem * sizem]()) {
+        memset(minfo, 0, sizem * sizem * sizeof(int));
+        for (size_t i = 0, j = 0; i < sizem * sizem; i += (sizem + 1), j++) {
+            minfo[i] = arr[j];
+        }
+    }
+
+
+    ~Matrix() {
+        delete[] minfo;
+    }
+
+    size_t getSize() const { //получение размерности
+        return sizem;
+    }
+
+    Matrix operator+(const Matrix& b) { //Суммирование
+        if (b.getSize() != getSize()) {
+            throw std::invalid_argument("Error, sizes of matrices are different");
+        }
+
+        Matrix sum(sizem);
+
+        for (int i = 0; i < sizem; i++) {
+            for (int j = 0; j < sizem; j++)
+                sum[i][j] = (*this)[i][j] + b[i][j];
+        }
+        return sum;
+    }
+
+    Matrix operator-(const Matrix& b) { //Разность
+        if (b.getSize() != getSize()) {
+            throw std::invalid_argument("Error, sizes of matrices are different");
+        }
+
+        Matrix neg(sizem);
+
+        for (int i = 0; i < sizem; i++) {
+            for (int j = 0; j < sizem; j++)
+                neg[i][j] = (*this)[i][j] - b[i][j];
+        }
+        return neg;
+    }
+
+    Matrix operator*(const Matrix& b) { //Умножение
+        if (b.getSize() != getSize()) {
+            throw std::invalid_argument("Error, sizes of matrices are different");
+        }
+
+        Matrix multi(sizem);
+
+        for (int i = 0; i < sizem; i++) {
+            for (int j = 0; j < sizem; j++) {
+                multi.minfo[i * sizem + j] = 0;
+                for (int k = 0; k < sizem; k++) {
+                    multi[i][j] += (*this)[i][k] * b[k][j];
+                }
+            }
+        }
+        return multi;
+    }
+
+    bool operator==(const Matrix& b) { //сравнение
+        if (b.getSize() != getSize()) {
+            throw std::invalid_argument("Error, sizes of matrices are different");
+        }
+        return !memcmp(minfo, b.minfo, sizem * sizem * sizeof(int));
+    }
+
+    bool operator!=(Matrix& b) {
+        return !(*this == b);
+    }
+
+    Matrix operator()(const size_t row, const size_t column) {
+
+        Matrix minor(sizem - 1);
+
+        int up_row = 0;
+        int up_column = 0;
+        for (int i = 0; i < sizem; i++) {
+
+            if (i == row) {
+                up_row = 1;
+                continue;
+            }
+            for (int j = 0; j < sizem; j++) {
+
+                if (j == column) {
+                    up_column = 1;
+                    continue;
+                }
+                minor[i - up_row][j - up_column] = (*this)[i][j];
+            }
+        }
+        return minor;
+    }
+
+    Column operator()(size_t col_id) const {
+        if (col_id > sizem || col_id < 1) {
+            throw std::invalid_argument("Invalid column index");
+        }
+        col_id--;
+        return { col_id, sizem, minfo };
+    }
+
+    Row operator[](size_t row_id) const {
+        if (row_id > sizem || row_id < 1) {
+            throw std::invalid_argument("Invalid row index");
+        }
+        row_id--;
+        return { row_id, sizem, minfo };
+    }
+
+
+    Matrix operator!() { //Транспонирование
+
+        Matrix trans(sizem);
+
+        for (int i = 0; i < sizem; i++) {
+            for (int j = 0; j < sizem; j++) {
+                trans[i][j] = (*this)[j][i];
+            }
+        }
+        return trans;
+    }
+
+
+    friend std::ostream& operator<<(std::ostream& stream, const Matrix& matrix) {
+        for (size_t i = 0; i < matrix.sizem; i++) {
+            stream << matrix[i + 1];
+            stream << "\n";
+        }
+        return stream;
+    }
+
+    friend std::istream& operator>>(std::istream& stream, const Matrix& matrix) {
+        for (size_t i = 0; i < matrix.sizem * matrix.sizem; i++) {
+            stream >> matrix.minfo[i];
+        }
+        return stream;
+    }
+
+};
+
+
+template<typename T>
+
+class LinkedList {
+private:
+    struct Node {
+        T element;
+        Node* next{};
+    };
+    Node* head;
+
+    Node* createNode(T const& val) { //Создание узла
+        Node* node = new Node;
+        node->next = nullptr;
+        node->element = val;
+        return node;
+    }
+
+public:
+    LinkedList() {
+        head = nullptr;
+    };
+
+    ~LinkedList() {
+        if (!isNull()) {
+            Node* ptr = head;
+            while (ptr->next != nullptr) {
+                Node* node_to_delete = ptr;
+                ptr = ptr->next;
+                delete (node_to_delete);
+            }
+            delete ptr;
+        }
+        head = nullptr;
+    };
+
+    bool isNull() {
+        return head == nullptr;
+    }
+
+    void pushFront(T const& element) {
+        Node* h = head;
+        head = createNode(element);
+        head->next = h;
+    };
+
+    explicit LinkedList(T& element) {
+        head = createNode(element);
+    }
+
+    //Iterator
+
+
+    class Iterator {
+
+    private:
+        friend class LinkedList<T>;
+
+    public:
+        Node* curr;
+
+        Iterator() {
+            curr = nullptr;
+        }
+
+        Iterator(LinkedList<T>::Iterator const& that) {
+            this->curr = that.curr;
+        }
+
+        explicit Iterator(LinkedList<T> const& list) {
+            curr = list.head;
+        }
+
+        T& operator*() {
+            assert(this->curr != nullptr);
+            return this->curr->element;
+        }
+
+        Iterator& operator++() {
+            if (curr == nullptr) {
+                curr = nullptr;
+            }
+            else {
+                curr = curr->next;
+            }
+            return *this;
+        }
+
+        bool operator!=(LinkedList<T>::Iterator that) const {
+            return (this->curr != that.curr);
+        }
+
+        bool isNull() {
+            return curr == nullptr;
+        }
+
+        bool operator==(Iterator const& that) const {
+            return (this->curr == that.curr);
+        }
+
+
+        /*
+                Iterator& operator++() {
+            if (curr == nullptr) {
+                curr = nullptr;
+            }
+            else {
+                curr = curr->next;
+            }
+            return *this;
+        }
+
+        bool operator!=(LinkedList<T>::Iterator that) const {
+            return (this->curr != that.curr);
+        }
+
+        bool isNull() {
+            return curr == nullptr;
+        }
+
+        bool operator==(Iterator const& that) const {
+            return (this->curr == that.curr);
+        }*/
+
+
+
+
+    };
+
+    Iterator begin() {
+        Iterator it(*this);
+        return it;
+    };
+
+    Iterator end() {
+        Iterator it;
+        it.curr = nullptr;
+        return it;
+    };
+
+    void setHead(Node* new_head) {
+        head = new_head;
+    }
+};
+
+
+//Hashmap
+
+template<typename Key, typename Value>
+class HashMap {
+    size_t size;
+    size_t content;
+    const double rehash_val;
+
+    size_t Hashcomp(Key& key) {              //Собственно хеш-таблица 
+        return std::hash<Key>{}(key) % size;
+    }
+
+    /*
+
+    class HashMap {
+        size_t size;
+        size_t capacity;
+        const double rehash_value;
+
+        size_t calcHash(Key& key) {
+            return std::hash<Key>{}(key) % size;
+        }
+
+        void rehash() {
+            HashMap<Key, Value> newHashmap(size * 2, rehash_value);
+            for (auto iter = this->begin(); iter != this->end(); ++iter) {
+                newHashmap.insert((*iter).first, (*iter).second);
+            }
+            auto temp = data;
+            this->data = newHashmap.data;
+            newHashmap.data = temp;
+
+            this->size *= 2;
+            newHashmap.size /= 2;
+        }
+
+        LinkedList<pair<Key, Value>>* data;
+     */
+
+    void rehash() {
+        HashMap<Key, Value> Hashmapnew(size * 2, rehash_val);
+        for (auto iter = this->begin(); iter != this->end(); ++iter) {
+            Hashmapnew.insert((*iter).first, (*iter).second);
+        }
+        auto temp = info;
+        this->info = Hashmapnew.info;
+        Hashmapnew.info = temp;
+
+        this->size *= 2;
+        Hashmapnew.size /= 2;
+    }
+
+    LinkedList<pair<Key, Value>>* info;
+
+
+public:
+
+    HashMap(size_t size, double rehash_val)
+        : info(new LinkedList<pair<Key, Value>>[size]),
+        size(size), content(0), rehash_val(rehash_val) {
+        for (size_t i = 0; i < size; i++) {
+            info[i] = LinkedList<pair<Key, Value>>();
+        }
+    }
+
+    void insert(Key& key, Value& val) {
+        size_t hash = Hashcomp(key);
+
+        info[hash].pushFront({ key, val });
+        content++;
+        checkRehash();
+    }
+
+
+    void deleteByKey(Key& key) {
+        size_t hash = Hashcomp(key);
+        auto iter = info[hash].begin();
+        if (iter.isNull()) return;
+
+        while (!iter.isNull() && (*iter).first == key) {
+            info[hash].setHead(iter.curr->next);
+            delete (iter.curr);
+            iter = info[hash].begin();
+            content--;
+        }
+        auto prev = iter;
+
+        ++iter;
+        while (!iter.isNull()) {
+            if ((*iter).first == key) {
+                prev.curr->next = iter.curr->next;
+                auto node_to_delete = iter.curr;
+                ++iter;
+                delete node_to_delete;
+                content--;
+            }
+            else {
+                ++iter;
+                ++prev;
+            }
+
+        }
+    }
+
+ /*
+
+
+    void deleteByKey(Key& key) {
+        size_t hash = calcHash(key);
+        auto iter = info[hash].begin();
+        if (iter.isNull()) return;
+
+        while (!iter.isNull() && (*iter).first == key) {
+            info[hash].setHead(iter.curr->next);
+            delete (iter.curr);
+            iter = info[hash].begin();
+            capacity--;
+        }
+        auto prev = iter;
+        ++iter;
+        while (!iter.isNull()) {
+            if ((*iter).first == key) {
+                prev.curr->next = iter.curr->next;
+                auto node_to_delete = iter.curr;
+                ++iter;
+                delete node_to_delete;
+                capacity--;
+            }
+            else {
+                ++iter;
+                ++prev;
+            }
+
+        }
+    }
+
+
+*/
+
+    void checkRehash() {
+        if ((double)content / (double)size >= rehash_val) {
+            rehash();
+        }
+    }
+
+    Value ValueByKey(Key& key) {
+        size_t hash = Hashcomp(key);
+        for (auto iter = info[hash].begin(); iter != info[hash].end(); ++iter) {
+            if ((*iter).first == key) {
+                return (*iter).second;
+            }
+        }
+    }
+
+    size_t amountofelem(Key& key) {
+        size_t hash = Hashcomp(key);
+        size_t count = 0;
+        for (auto iter = info[hash].begin(); iter != info[hash].end(); ++iter) {
+            if ((*iter).first == key)
+                count++;
+        }
+        return count;
+    }
+
+    vector<Value> allValuesByKey(Key& key) {
+
+        size_t hash = Hashcomp(key);
+        vector<Value> val_vec;
+        for (auto iter = info[hash].begin(); iter != info[hash].end(); ++iter) {
+            if ((*iter).first == key) {
+                val_vec.push_back((*iter).second);
+            }
+        }
+        return val_vec;
+    }
+
+    void replace(Key& key, Value& val) {
+        deleteByKey(key);
+        insert(key, val);
+    }
+
+    //Iterator
+
+    class Iterator {
+    private:
+        friend class HashMap<Key, Value>;
+
+        typename LinkedList<pair<Key, Value>>::Iterator list_iter;
+
+        LinkedList<pair<Key, Value>>* choose_list;
+        LinkedList<pair<Key, Value>>* last_list;
+
+
+    public:
+        Iterator() = default;
+
+        Iterator(LinkedList<pair<Key, Value>>* cur, LinkedList<pair<Key, Value>>* end) {
+            choose_list = cur;
+            last_list = end;
+            list_iter = choose_list->begin();
+        }
+
+        pair<Key, Value>& operator*() {
+            assert(!list_iter.isNull());
+            return (*list_iter);
+        }
+
+        Iterator& operator++() {
+            ++list_iter;
+            if (list_iter.isNull()) {
+                choose_list++;
+                while (choose_list != last_list && choose_list->isNull())
+                    choose_list++;
+                if (choose_list != last_list)
+                    list_iter = choose_list->begin();
+
+            }
+            return *this;
+        }
+
+        bool operator!=(Iterator const& b) const {
+            if (choose_list == last_list && b.choose_list == last_list) {
+                return false;
+            }
+            if (choose_list != b.choose_list)
+                return true;
+            return (this->list_iter != b.list_iter);
+        }
+
+        bool operator==(Iterator const& b) const {
+            return !(*this != b);
+        }
+    };
+
+    Iterator begin() {
+        if (content == 0)
+            return end();
+        Iterator it(info, &info[size]);
+        while (it.choose_list->isNull()) {
+            it.choose_list++;
+        }
+        it.list_iter = it.choose_list->begin();
+        return it;
+    }
+
+    Iterator end() {
+        Iterator it(&info[size], &info[size]);
+        return it;
+    }
+
+    size_t countValues() {
+        return content;
+    }
+
+    size_t countUniqueValues() {
+        if (countValues() == 0)
+            return 0;
+        HashMap<Value, char> map(size, rehash_val);
+        for (auto iter = this->begin(); iter != this->end(); ++iter) {
+            char m = 0;
+            map.replace((*iter).second, m);
+        }
+        return map.countValues();
+    }
+};
+
+
+template<typename Key, typename Value>
+void startProgram(istream& input, ostream& output) {
+    size_t n;
+    input >> n;
+    char action;
+    HashMap<Key, Value> hashMap(100, 0.75);
+    Key key;
+    Value val;
+    for (size_t i = 0; i < n; i++) {
+        input >> action;
+        if (action == 'A') {
+            input >> key >> val;
+            hashMap.replace(key, val);
+          
+        }
+        if (action == 'R') {
+            input >> key;
+            hashMap.deleteByKey(key);
+        }
+    }
+    output << hashMap.countValues() << " " << hashMap.countUniqueValues();
+}
+
+
+
+int main() {
+    char type_of_key;
+    char type_of_val;
+
+    ifstream fin("input.txt");
+    ofstream fout("output.txt");
+
+    fin >> type_of_key >> type_of_val;
+
+    if (type_of_key == 'I' && type_of_val == 'S') {
+        startProgram<int, string>(fin, fout);
+    }
+    else if (type_of_key == 'I' && type_of_val == 'D') {
+        startProgram<int, double>(fin, fout);
+    }
+    else if (type_of_key == 'D' && type_of_val == 'S') {
+        startProgram<double, string>(fin, fout);
+    }
+    else if (type_of_key == 'D' && type_of_val == 'I') {
+        startProgram<double, int>(fin, fout);
+    }
+    else if (type_of_key == 'S' && type_of_val == 'I') {
+        startProgram<string, int>(fin, fout);
+    }
+    else if (type_of_key == 'S' && type_of_val == 'D') {
+        startProgram<string, double>(fin, fout);
+    }
+    else if (type_of_key == 'I' && type_of_val == 'I') {
+        startProgram<int, int>(fin, fout);
+    }
+    else if (type_of_key == 'D' && type_of_val == 'D') {
+        startProgram<double, double>(fin, fout);
+    }
+    else if (type_of_key == 'S' && type_of_val == 'S') {
+        startProgram<string, string>(fin, fout);
+    }
+
+    return 0;
+}
