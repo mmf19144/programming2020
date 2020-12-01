@@ -1,5 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS
-
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -486,42 +484,7 @@ public:
 
         }
     }
-
- /*
-
-
-    void deleteByKey(Key& key) {
-        size_t hash = calcHash(key);
-        auto iter = info[hash].begin();
-        if (iter.isNull()) return;
-
-        while (!iter.isNull() && (*iter).first == key) {
-            info[hash].setHead(iter.curr->next);
-            delete (iter.curr);
-            iter = info[hash].begin();
-            capacity--;
-        }
-        auto prev = iter;
-        ++iter;
-        while (!iter.isNull()) {
-            if ((*iter).first == key) {
-                prev.curr->next = iter.curr->next;
-                auto node_to_delete = iter.curr;
-                ++iter;
-                delete node_to_delete;
-                capacity--;
-            }
-            else {
-                ++iter;
-                ++prev;
-            }
-
-        }
-    }
-
-
-*/
-
+    
     void checkRehash() {
         if ((double)content / (double)size >= rehash_val) {
             rehash();
