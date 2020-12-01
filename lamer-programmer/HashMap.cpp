@@ -169,9 +169,9 @@ public:
 				index--;
 				if (index == -1)
 				{
-					index == max_size - 1;
+					index = max_size - 1;
 				}
-			} while (arr[index] = nullptr);
+			} while (arr[index] == nullptr);
 			return *this;
 		}
 
@@ -421,27 +421,4 @@ int main()
 	{
 		execution<std::string, std::string>(fin, fout);
 	}
-
-	/*HashMap<int, int> hash_map{0.8};
-	
-	std::cout << hash_map.size1() << std::endl;
-	hash_map.insert({1, 2});
-	std::cout << hash_map.size1() << std::endl;
-	hash_map.insert({2, 2});
-	std::cout << hash_map.size1() << std::endl;
-	hash_map.insert({3, 3});
-	std::cout << hash_map.size1() << std::endl;
-	hash_map.insert({4, 4});
-	std::cout << hash_map.size1() << std::endl;
-	hash_map.insert({5, 5});
-	std::cout << hash_map.size1() << std::endl;
-	hash_map.insert({6, 6});
-	std::cout << hash_map.size1() << std::endl;
-	hash_map.erase(10);
-
-	auto it = hash_map.begin();
-	for (size_t i = 0; i < hash_map.size(); i++, it++)
-	{
-		std::cout << (*it).first << " " << (*it).second << std::endl;
-	}*/
 }
