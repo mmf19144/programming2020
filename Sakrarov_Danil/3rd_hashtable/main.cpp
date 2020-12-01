@@ -1,7 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <map>
-#include <vector>
+#include <assert.h>
+#include <iterator>
 
 #define rehash_value 0.5
 
@@ -11,11 +12,13 @@ private:
     K key;
     V value;
     bool Filled;
+    bool Deleted = false;
 public:
     Slot() : Filled(false) {
     }
 
     V getValue() {
+        assert(Filled && !Deleted);
         return value;
     }
 
@@ -25,6 +28,10 @@ public:
 
     bool getFilled() {
         return Filled;
+    }
+
+    bool getDeleted() {
+        return Deleted;
     }
 
     void setValue(const V &s) {
@@ -39,6 +46,7 @@ public:
 
     void delete_element() {
         Filled = false;
+        Deleted = true;
     }
 
 
@@ -47,7 +55,7 @@ public:
 template<typename K, typename V>
 class HashMap {
 private:
-    size_t capacity=0;
+    size_t capacity = 0;
     size_t size;
     Slot<K, V> *table;
 public:
@@ -59,7 +67,6 @@ public:
     }
 
     ~HashMap() {
-
         delete[] table;
     }
 
@@ -83,7 +90,7 @@ public:
     };
 
 
-    class Iterator {
+    class Iterator : public std::iterator<std::input_iterator_tag, Slot<K, V>> {
     private:
         friend class HashMap<K, V>;
 
@@ -135,17 +142,26 @@ public:
     }
 
     Iterator end() {
-
-
         return Iterator(nullptr, nullptr);
     }
 
 
     V &find(const K &getKey) {
-        for (auto it: *this) {
-            if (it.getKey() == getKey) {
-                return it.getValue();
+        size_t hash_value = std::hash<K>()(getKey) % size;
+
+        size_t iter = hash_value;
+        if (table[iter].getFilled() && table[iter].getKey() == getKey) {
+            return table[iter].getValue();
+        } else {
+            iter++;
+            while (table[iter].getFilled() && table[iter].getKey() != getKey && iter != hash_value) {
+                iter++;
+                iter %= size;
             }
+            if (!table[iter].getDeleted)
+                return table[iter].getValue();
+            else
+                return nullptr;
         }
     }
 
@@ -161,7 +177,7 @@ public:
         size *= 2;
         table = tmp.table;
         tmp.table = nullptr;
-        capacity= tmp.capacity;
+        capacity = tmp.capacity;
     }
 
     void add_val(const size_t hash_value, const K &addKey, const V &addValue) {
@@ -169,7 +185,7 @@ public:
         if (table[iter].getFilled() && table[iter].getKey() == addKey) {
             table[iter].setValue(addValue);
         } else {
-            while (table[iter].getFilled()) {
+            while (table[iter].getFilled() && table[iter].getKey() != addKey) {
                 iter++;
                 iter %= size;
             }
