@@ -24,6 +24,10 @@ private:
         return node;
     }
 
+    void setHead(Node *new_head) {
+        head = new_head;
+    }
+
 public:
     LinkedList() {
         head = nullptr;
@@ -107,6 +111,24 @@ public:
 
     };
 
+    void deleteHeadByIterator(Iterator &it) {
+        if (it == begin()) {
+            setHead(it.curr->next);
+            delete (it.curr);
+            it = begin();
+        }
+    }
+    void deleteByIterator(Iterator &it, Iterator &prev){
+        if (it == begin()) {
+            deleteHeadByIterator(it);
+        } else{
+            prev.curr->next = it.curr->next;
+            auto node_to_delete = it.curr;
+            ++it;
+            delete node_to_delete;
+        }
+    }
+
     Iterator begin() {
         Iterator it(*this);
         return it;
@@ -114,7 +136,6 @@ public:
 
     Iterator end() {
         Iterator it;
-        it.curr = nullptr;
         return it;
     };
 
@@ -127,9 +148,7 @@ public:
         return false;
     };
 
-    void setHead(Node *new_head) {
-        head = new_head;
-    }
+
 };
 
 template<typename Key, typename Value>
@@ -151,11 +170,16 @@ class HashMap {
         this->data = newHashmap.data;
         newHashmap.data = temp;
 
-        this->size *= 2;
-        newHashmap.size /= 2;
+        swap(this->size, newHashmap.size);
     }
 
     LinkedList<pair<Key, Value>> *data;
+    size_t rehash_capacity;
+    void insertWithHash(Key &key, Value &val, size_t hash) {
+        data[hash].pushFront({key, val});
+        capacity++;
+        checkRehash();
+    }
 public:
 
     HashMap(size_t size, double rehash_value)
@@ -164,12 +188,10 @@ public:
         for (size_t i = 0; i < size; i++) {
             data[i] = LinkedList<pair<Key, Value>>();
         }
+        rehash_capacity = size*rehash_value;
     }
 
     ~HashMap() {
-        for (size_t i = 0; i < size; i++) {
-            data[i].clear();
-        }
         delete[] data;
     }
 
@@ -182,30 +204,29 @@ public:
     }
 
     void checkRehash() {
-        if ((double) capacity / (double) size >= rehash_value) {
+        if (capacity >= rehash_capacity){
             rehash();
+            rehash_capacity = size*rehash_value;
         }
     }
 
-    void deleteByKey(Key &key) {
+    size_t deleteByKey(Key &key) {
         size_t hash = calcHash(key);
         auto iter = data[hash].begin();
-        if (iter.isNull()) return;
+        if (iter.isNull()) return hash;
 
         while (!iter.isNull() && (*iter).first == key) {
-            data[hash].setHead(iter.curr->next);
-            delete (iter.curr);
-            iter = data[hash].begin();
+            data[hash].deleteHeadByIterator(iter);
+//            data[hash].setHead(iter.curr->next);
+//            delete (iter.curr);
+//            iter = data[hash].begin();
             capacity--;
         }
         auto prev = iter;
         ++iter;
         while (!iter.isNull()) {
             if ((*iter).first == key) {
-                prev.curr->next = iter.curr->next;
-                auto node_to_delete = iter.curr;
-                ++iter;
-                delete node_to_delete;
+                data[hash].deleteByIterator(iter, prev);
                 capacity--;
             } else {
                 ++iter;
@@ -213,6 +234,7 @@ public:
             }
 
         }
+        return hash;
     }
 
     Value getValueByKey(Key &key) {
@@ -235,7 +257,6 @@ public:
     }
 
     vector<Value> getAllValuesByKey(Key &key) {
-
         size_t hash = calcHash(key);
         vector<Value> val_vec;
         for (auto iter = data[hash].begin(); iter != data[hash].end(); ++iter) {
@@ -247,27 +268,27 @@ public:
     }
 
     void replace(Key &key, Value &val) {
-        deleteByKey(key);
-        insert(key, val);
+        size_t hash = deleteByKey(key);
+        insertWithHash(key, val, hash);
     }
 
     class Iterator {
     private:
         friend class HashMap<Key, Value>;
-
         typename LinkedList<pair<Key, Value>>::Iterator list_iter;
 
         LinkedList<pair<Key, Value>> *cur_list;
         LinkedList<pair<Key, Value>> *end_list;
 
-
     public:
         Iterator() = default;
 
-        Iterator(LinkedList<pair<Key, Value>> *cur, LinkedList<pair<Key, Value>> *end){
+        Iterator(LinkedList<pair<Key, Value>> *cur, LinkedList<pair<Key, Value>> *end) {
             cur_list = cur;
             end_list = end;
-            list_iter = cur_list->begin();
+            if (cur_list != end_list){
+                list_iter = cur_list->begin();
+            }
         }
 
         pair<Key, Value> &operator*() {
@@ -298,7 +319,7 @@ public:
         }
 
         bool operator==(Iterator const &that) const {
-            return !(*this!=that);
+            return !(*this != that);
 //            if (cur_list == end_list && that.cur_list == end_list) {
 //                return true;
 //            }
@@ -309,7 +330,7 @@ public:
     Iterator begin() {
         if (capacity == 0)
             return end();
-        Iterator it (data, &data[size]);
+        Iterator it(data, &data[size]);
         while (it.cur_list->isNull()) {
             it.cur_list++;
         }
@@ -318,7 +339,7 @@ public:
     }
 
     Iterator end() {
-        Iterator it (&data[size], &data[size]);
+        Iterator it(&data[size], &data[size] );
         return it;
     }
 
