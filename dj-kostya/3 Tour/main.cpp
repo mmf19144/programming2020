@@ -4,12 +4,15 @@
 #include <memory>
 #include <algorithm>
 #include <exception>
+#include <iterator>
+#include <memory>
+#include <cassert>
 
-#define ADDITIONAL_TASK
+
+
+//#define ADDITIONAL_TASK
 #ifdef ADDITIONAL_TASK
-
 #include "Matrix.cpp"
-
 #endif
 
 template<typename T>
@@ -72,7 +75,7 @@ public:
         head = std::move(head->getNext());
     }
 
-    class Iterator {
+    class Iterator : public std::iterator<std::input_iterator_tag, T> {
     private:
         friend class List<T>;
 
@@ -165,9 +168,9 @@ private:
         for (const auto &it: *this) {
             new_table.insert(it.first, it.second);
         }
-        data = new_table.data;
+        std::swap(data, new_table.data);
         capacity = new_table.capacity;
-        size *= 2;
+        size = new_table.size;
     }
 
     size_t hash(Key k) {
@@ -178,6 +181,11 @@ public:
     hash_map(size_t size_, float rehash) : rehash_value(rehash),
                                            size(size_),
                                            data(new List<std::pair<Key, Value>>[size_]) {
+        assert(data != nullptr);
+    }
+
+    ~hash_map() {
+        delete[] data;
     }
 
     void insert(Key k, Value v) {
@@ -217,7 +225,7 @@ public:
         throw std::invalid_argument("Key doesn't exists");
     }
 
-    class Iterator {
+    class Iterator : public std::iterator<std::input_iterator_tag, std::pair<Key, Value>> {
     private:
         friend class hash_map<Key, Value>;
 
@@ -308,7 +316,7 @@ namespace std {
 
 template<typename Key, typename Value>
 size_t getCntUniqValues(hash_map<Key, Value> *hm) {
-    hash_map<Value, bool> a(100, 0.75);
+    hash_map<Value, bool> a(5, 0.5);
     for (const auto &it: *hm) {
         a.insert(it.second, true);
     }
@@ -320,18 +328,25 @@ void run(std::istream &input, std::ostream &output) {
     size_t n;
     input >> n;
     char action;
-    hash_map<Key, Value> hash_map(100, 0.75);
+    hash_map<Key, Value> hash_map(100, 0.5);
     Key key;
     Value val;
     for (size_t i = 0; i < n; i++) {
         input >> action;
-        if (action == 'A') {
-            input >> key >> val;
-            hash_map.insert(key, val);
-        }
-        if (action == 'R') {
-            input >> key;
-            hash_map.delKey(key);
+        switch (action) {
+            case 'A': {
+                input >> key >> val;
+                hash_map.insert(key, val);
+                break;
+            }
+            case 'R': {
+                input >> key;
+                hash_map.delKey(key);
+                break;
+            }
+            default:
+                break;
+
         }
     }
     output << hash_map.getCapacity() << " " << getCntUniqValues<Key, Value>(&hash_map);
