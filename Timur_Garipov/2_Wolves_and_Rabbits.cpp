@@ -130,18 +130,18 @@ protected:
             this->count_step = 0;
 
             switch (direction) {
-                case up:
-                    direction = right;
-                    break;
-                case right:
-                    direction = down;
-                    break;
-                case down:
-                    direction = left;
-                    break;
-                case left:
-                    direction = up;
-                    break;
+            case up:
+                direction = right;
+                break;
+            case right:
+                direction = down;
+                break;
+            case down:
+                direction = left;
+                break;
+            case left:
+                direction = up;
+                break;
             }
         }
     }
@@ -149,18 +149,18 @@ protected:
         int step = dim_of_step;
 
         switch (this->direction) {
-            case up:
-                this->coordinates.y -= step;
-                break;
-            case right:
-                this->coordinates.x += step;
-                break;
-            case down:
-                this->coordinates.y += step;
-                break;
-            case left:
-                this->coordinates.x -= step;
-                break;
+        case up:
+            this->coordinates.y -= step;
+            break;
+        case right:
+            this->coordinates.x += step;
+            break;
+        case down:
+            this->coordinates.y += step;
+            break;
+        case left:
+            this->coordinates.x -= step;
+            break;
         }
 
         this->coordinates.checkBorder(N, M);
@@ -367,15 +367,15 @@ public:
                         main_shk->killstreak++;
 
                         switch (Animals_in_cell[z1].className) {
-                            case 'r':
-                                rabbits[Animals_in_cell[z1].order].mustDie();
-                                break;
-                            case 'w':
-                                wolves[Animals_in_cell[z1].order].mustDie();
-                                break;
-                            case 's':
-                                shakals[Animals_in_cell[z1].order].mustDie();
-                                break;
+                        case 'r':
+                            rabbits[Animals_in_cell[z1].order].mustDie();
+                            break;
+                        case 'w':
+                            wolves[Animals_in_cell[z1].order].mustDie();
+                            break;
+                        case 's':
+                            shakals[Animals_in_cell[z1].order].mustDie();
+                            break;
                         }
                         z1++;
                         countFood++;
@@ -413,7 +413,7 @@ private:
     std::string input_file;
     std::string output_file;
     int count_rabbits,
-            count_wolves;
+        count_wolves;
     int timeSim;
     Field field;
 
@@ -422,8 +422,8 @@ private:
     std::vector<Shakal> vect_shakals;
 
     Pole* ground_rabbits,
-            * ground_wolves,
-            * ground_shakals;
+        * ground_wolves,
+        * ground_shakals;
 public:
     int getCountRab() {
         return count_rabbits;
@@ -492,7 +492,7 @@ public:
     void startSimulation() {
         coordinate z(field.getXdim(), field.getYdim());
         int countRab = vect_rabbit.size(),
-                countWolves = vect_wolf.size();
+            countWolves = vect_wolf.size();
 
         for (int i = 0; i < this->timeSim; i++) {
             countRab = vect_rabbit.size();
@@ -515,7 +515,7 @@ public:
 
 
                         int size_for_sort = ground_wolves->massive[i][j].arr_order.size();
-                        for (int i1 = 0; i < size_for_sort; i1++)
+                        for (int i1 = 0; i1 < size_for_sort; i1++)
                             for (int j1 = i1 + 1; j1 < size_for_sort; j1++)
                                 if (vect_wolf[ground_wolves->massive[i][j].arr_order[i1]].getAge() <
                                     vect_wolf[ground_wolves->massive[i][j].arr_order[j1]].getAge()) {
@@ -529,7 +529,7 @@ public:
                         vect_wolf[ground_wolves->massive[i][j].arr_order[0]].eating(vect_rabbit);
 
                         ground_wolves->massive[i][j].value = ground_wolves->massive[i][j].value +
-                                                             vect_wolf.size() - prev_size;
+                            vect_wolf.size() - prev_size;
                         ground_rabbits->massive[i][j].value = 0;
                     }
 
@@ -563,7 +563,7 @@ public:
     void printResult() {
         std::ofstream fout("output.txt");
         int N = field.getXdim(),
-                M = field.getYdim();
+            M = field.getYdim();
         updatePole(vect_wolf.size(), vect_rabbit.size());
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < M; j++) {
