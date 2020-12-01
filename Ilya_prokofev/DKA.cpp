@@ -5,6 +5,7 @@
 #include <queue>
 #include <string>
 #include <fstream>
+#include <algorithm>
 using namespace std;
 
 typedef unordered_map <string, bool> map_s;
@@ -127,6 +128,7 @@ public:
 				return it->second.second;
 			}
 		}
+		return ("empty");
 	}
 	bool recognition(string input) {
 		string cur_state = initial_state;
