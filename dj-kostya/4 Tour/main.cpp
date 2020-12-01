@@ -1,10 +1,9 @@
 #include <iostream>
 #include <map>
+#include <set>
 #include <vector>
-#include <string>
 #include <algorithm>
 #include <fstream>
-#include <set>
 #include <queue>
 
 //#define DEBUG
@@ -18,12 +17,12 @@ unsignedSet getSetOfOneEl(unsigned el) {
 }
 
 class NFA {
-public:
+private:
     std::map<unsignedSet, std::map<char, unsignedSet>> transitions;
     std::vector<unsigned> endStates;
     unsigned startState = 0;
     size_t statesCnt = 0;
-
+public:
 
     NFA() = default;
 
@@ -59,6 +58,14 @@ public:
     unsigned getStartState() const {
         return startState;
     }
+
+    std::map<unsignedSet, std::map<char, unsignedSet>> *getTransitions() {
+        return &transitions;
+    }
+
+    std::vector<unsigned> *getEndStates() {
+        return &endStates;
+    }
 };
 
 
@@ -68,11 +75,10 @@ private:
     std::map<unsignedSet, std::map<char, unsignedSet>> transitions;
     std::set<unsignedSet > endStates;
     unsigned startState = 0;
-
 public:
     DFA() = default;
 
-    DFA(NFA &other) {
+    explicit DFA(NFA &other) {
         startState = other.getStartState();
         std::queue<unsignedSet > q;
         q.push(getSetOfOneEl(startState));
@@ -80,7 +86,7 @@ public:
             auto top = q.front();
             q.pop();
             for (auto state: top) {
-                for (const auto &ch: other.transitions[getSetOfOneEl(state)]) {
+                for (const auto &ch: other.getTransitions()->operator[](getSetOfOneEl(state))) {
                     for (const auto &el: ch.second) {
                         transitions[top][ch.first].insert(el);
                     }
@@ -91,15 +97,15 @@ public:
             }
         }
 
-        for (auto key: transitions) {
-            for (auto t: other.endStates) {
+        for (const auto &key: transitions) {
+            for (auto t: *other.getEndStates()) {
                 if (std::find(key.first.begin(), key.first.end(), t) != key.first.end()) {
                     endStates.insert(key.first);
                     break;
                 }
             }
         }
-        for (auto t: other.endStates) {
+        for (auto t: *other.getEndStates()) {
             endStates.insert(getSetOfOneEl(t));
         }
 #ifdef DEBUG
