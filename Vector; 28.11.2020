@@ -1,6 +1,7 @@
 #include <fstream>
 #include <string>
 #include <typeinfo>
+#include <cmath>
 
 
 template<typename T>
@@ -49,7 +50,7 @@ public:
 
 	void pop(size_t idx) {
 		if (idx >= cap)
-			throw std::exception("удаление по некорректному индексу");
+			throw "удаление по некорректному индексу";
 
 		for (size_t i = idx; i < cap - 1; i++)
 			data[i] = data[i + 1];
@@ -58,7 +59,7 @@ public:
 
 	T& operator [](size_t idx) {
 		if (idx >= cap)
-			throw std::exception("попытка взятия элемента по некорректному индексу");
+			throw "попытка взятия элемента по некорректному индексу";
 
 		return data[idx];
 	}
@@ -86,7 +87,7 @@ public:
 
 	void Print(std::ostream& out) {
 		if(cap == 0)
-			throw std::exception("попытка печати пустого массива");
+			throw "попытка печати пустого массива";
 		
 		for (size_t i = 0; i < cap; i++)
 			out << data[i] << std::endl;
@@ -140,9 +141,9 @@ void run(std::istream& in, std::ostream& out) {
 		}
 		u.Print(out);
 	}
-	catch (const std::exception&)
+	catch (const char* ex)
 	{
-		//out << "Ошибка: " << error.what();
+		//out << "Ошибка: " << ex << std::endl;
 		out << "ERROR" << std::endl;
 	}
 }
