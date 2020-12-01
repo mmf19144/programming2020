@@ -1,9 +1,16 @@
 #include <iostream>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <algorithm>
 #include <exception>
+
+#define ADDITIONAL_TASK
+#ifdef ADDITIONAL_TASK
+
 #include "Matrix.cpp"
+
+#endif
 
 template<typename T>
 class List {
@@ -282,7 +289,7 @@ public:
     }
 };
 
-
+#ifdef ADDITIONAL_TASK
 namespace std {
     template<>
     struct hash<Matrix> {
@@ -293,11 +300,11 @@ namespace std {
                     sum += std::hash<int>{}(m[i][j]);
                 }
             }
-            return sum % SIZE_T_MAX;
+            return sum % std::numeric_limits<size_t>::max();
         }
     };
 }
-
+#endif
 
 template<typename Key, typename Value>
 size_t getCntUniqValues(hash_map<Key, Value> *hm) {
