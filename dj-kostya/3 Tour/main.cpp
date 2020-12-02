@@ -203,6 +203,8 @@ public:
     }
 
     void delKey(Key k) {
+        if (capacity == 0)
+            return;
         size_t key_hash = hash(k);
         if (data[key_hash].isExist(k)) {
             std::pair<Key, Value> p(k, operator[](k));
@@ -328,7 +330,7 @@ void run(std::istream &input, std::ostream &output) {
     size_t n;
     input >> n;
     char action;
-    hash_map<Key, Value> hash_map(100, 0.5);
+    hash_map<Key, Value> hash_map(2, 0.5);
     Key key;
     Value val;
     for (size_t i = 0; i < n; i++) {
