@@ -43,6 +43,10 @@ public:
     int getDimension() const {
         return this->dimension;
     }
+    int getElement(int n) const {
+        if (n >= 0 && n < dimension * dimension)
+            return memory[n];
+    }
     matrix() {
         this->dimension = 0;
         this->memory = nullptr;
@@ -102,7 +106,7 @@ public:
             }
             return minorOfMatrix;
         }
-        else return NULL;
+        else return 0;
     }
     RowOfMatrix& operator[](int n) {
         n--;
