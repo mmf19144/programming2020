@@ -2,6 +2,9 @@
 #include <fstream>
 #include <map>
 #include <vector>
+#include <math.h>
+#include <iostream>
+#include <fstream>
 
 class RowOfMatrix {
 protected:
@@ -109,7 +112,7 @@ public:
             }
             return minorOfMatrix;
         }
-        else return NULL;
+        else return 0;
     }
     RowOfMatrix& operator[](int n) {
         n--;
@@ -268,15 +271,20 @@ template<> struct std::hash<matrix> {
 template <typename K, typename V>
 class Cell {
 private:
+    bool wasFilling;
     bool statFill;
     K key;
     V value;
 public:
     Cell() {
+        wasFilling = false;
         statFill = false;
     }
     bool getStatFill() {
         return statFill;
+    }
+    bool wasItFilled() {
+        return wasFilling;
     }
     K getKey() {
         return key;
@@ -287,10 +295,12 @@ public:
     void setKey(const K& s) {
         key = s;
         statFill = true;
+        wasFilling = true;
     }
     void setValue(const V& s) {
         value = s;
         statFill = true;
+        wasFilling = true;
     }
     void delElement() {
         statFill = 0;
@@ -302,7 +312,7 @@ class HashMap {
 protected:
     size_t countPairs;
     size_t size;
-    Cell<K, V>* massive;
+    Cell<K, V>* massive, * old_massive;
     V iterOfFind(size_t hash_val, const K& find_key) {
         if (hash_val < size) {
             if (massive[hash_val].getStatFill()) {
@@ -317,7 +327,10 @@ protected:
             else {
 
                 hash_val++;
-                return iterOfFind(hash_val, find_key);
+                if (hash_val != size && massive[hash_val].wasItFilled())
+                    return iterOfFind(hash_val, find_key);
+                else
+                    return NULL;
             }
         }
         else
@@ -326,20 +339,24 @@ protected:
     void realloc(const size_t& new_size) {
 
         Cell<K, V>* new_massive = new Cell<K, V>[new_size];
-
-
-        for (size_t i = 0; i < size; i++)
-            new_massive[i] = massive[i];
-
-
-        delete[] massive;
-
+        old_massive = massive;
         massive = new_massive;
+
+
+
+        size_t old_size = size;
         size = new_size;
+        for (size_t i = 0; i < old_size; i++)
+            if (old_massive[i].getStatFill())
+                addElement(old_massive[i].getKey(), old_massive[i].getValue());
+
+
+        delete[] old_massive;
     }
     void iterOfAdd(size_t hash_value, const K& addKey, const V& addValue) {
         if (hash_value >= size) {
             realloc(hash_value * 2);
+            hash_value = getHash(addKey);
         }
 
         if (massive[hash_value].getStatFill()) {
@@ -355,7 +372,7 @@ protected:
             countPairs++;
         }
     }
-    void iterOfDel(size_t hash_val, const K& delKey) {
+    virtual void iterOfDel(size_t hash_val, const K& delKey) {
         if (hash_val >= size) {
             return;
         }
@@ -371,11 +388,12 @@ protected:
             }
         }
         else {
-            iterOfDel(hash_val + 1, delKey);
+            if (hash_val + 1 != size && massive[hash_val + 1].wasItFilled())
+                iterOfDel(hash_val + 1, delKey);
         }
     }
     size_t getHash(const K& Key) {
-        return std::hash<K>()(Key) % 997;
+        return std::hash<K>()(Key) % size;
     }
 public:
     class Iterator {
@@ -416,7 +434,7 @@ public:
         }
     }
     HashMap() {
-        size = 1000;
+        size = 1000000;
         massive = new Cell<K, V>[size];
         countPairs = 0;
     };
@@ -459,7 +477,7 @@ public:
 template <typename K, typename V>
 class MultiHashMap : public HashMap<K, V> {
 private:
-    void iterOfDel(size_t hash_val, const K& delKey) {
+    void iterOfDel(size_t hash_val, const K& delKey) override {
         if (hash_val >= this->size) {
             return;
         }
@@ -469,7 +487,8 @@ private:
                 this->massive[hash_val].delElement();
                 this->countPairs--;
             }
-            iterOfDel(hash_val + 1, delKey);
+            if (this->massive[hash_val + 1].wasItFilled())
+                iterOfDel(hash_val + 1, delKey);
         }
     }
     std::vector<Cell<K, V>> getAllElementsByKey(const K& findKey) {
@@ -477,7 +496,7 @@ private:
         std::vector<Cell<K, V>> support;
 
         if (hash_val < this->size) {
-            for (; hash_val != this->size;) {
+            for (; hash_val != this->size && this->massive[hash_val].wasItFilled();) {
                 if (this->massive[hash_val].getStatFill() == true) {
                     if (this->massive[hash_val].getKey() == findKey)
                         support.push_back(this->massive[hash_val]);
@@ -495,7 +514,7 @@ private:
         size_t count = 0;
 
         if (hash_val < this->size) {
-            for (; hash_val != this->size;) {
+            for (; hash_val != this->size && this->massive[hash_val].wasItFilled();) {
                 if (this->massive[hash_val].getStatFill() == true) {
                     if (this->massive[hash_val].getKey() == findKey)
                         count++;
