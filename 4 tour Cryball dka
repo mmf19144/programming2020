@@ -57,7 +57,10 @@ public:
         }
         return ptr->last_one;
     }
-
+    ~DKA() {
+        for (size_t i = 0; i < countStates; ++i)
+            delete states[i];
+     }
 private:
     static size_t charCode(char c) {
         return c - 'a';
@@ -68,28 +71,28 @@ private:
     vector<Node*> states;
 
 };
-
-class NKA {
-public:
-    class Node {
-        unordered_map<size_t, set<size_t>> transition; 
-        bool last_one;
-
-        Node(bool last_one) : last_one(last_one) {}
-        bool hasTransition(size_t key) {
-            return !transition.empty();
-        }
-    };
-
-
-private:
-    vector<Node*> states;
-    size_t startState;
-    size_t countStates;
-};
+//
+//class NKA {
+//public:
+//    class Node {
+//        unordered_map<size_t, set<size_t>> transition;
+//        bool last_one;
+//
+//        Node(bool last_one) : last_one(last_one) {}
+//        bool hasTransition(size_t key) {
+//            return !transition.empty();
+//        }
+//    };
+//
+//
+//private:
+//    vector<Node*> states;
+//    size_t startState;
+//    size_t countStates;
+//};
 
 int main() {
-    
+
     ifstream fin("input.txt");
     ofstream fout("output.txt");
 
@@ -101,17 +104,17 @@ int main() {
     fin >> n >> k >> f;
 
     vector<size_t> laststates(f);
-    for(size_t i = 0; i < f; ++i)
+    for (size_t i = 0; i < f; ++i)
         fin >> laststates[i];
 
-    DKA dka(n,k,laststates);
+    DKA dka(n, k, laststates);
     fin >> p;
 
     size_t from;
     size_t to;
     char val;
 
-    for(size_t i = 0; i < p; ++i){
+    for (size_t i = 0; i < p; ++i) {
         fin >> from >> to >> val;
         dka.insert(from, to, val);
     }
@@ -120,11 +123,11 @@ int main() {
     size_t t;
     string s;
     fin >> t;
-    for(size_t i = 0; i < t; ++i){
+    for (size_t i = 0; i < t; ++i) {
         fin >> s;
-        fout <<  (dka.has(s) ? "YES" : "NO") << endl;
+        fout << (dka.has(s) ? "YES" : "NO") << endl;
     }
-    
+
 
 
 }
