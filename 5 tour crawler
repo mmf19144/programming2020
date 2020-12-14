@@ -14,6 +14,7 @@
 using namespace std;
 
 string RepositoryDownl = "C:\\crawler\\";
+string Repositorypushl = "C:\\crawler_output\\";
 
 class crawler {
 public:
@@ -32,7 +33,7 @@ public:
 
     static void ThreadFileCopy(string filename) {
         ifstream in(filename);
-        string outputFile = RepositoryDownl + filename;
+        string outputFile = Repositorypushl + filename;
         ofstream out(outputFile);
         string input;
         out << in.rdbuf();
