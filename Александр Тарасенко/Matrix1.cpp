@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 
-//using namespace std;
+using namespace std;
 
 
 class Column {
@@ -39,15 +39,13 @@ private:
     int size;
     int* arr;
 public:
-    Matrix() {
-        size = 0;
-        int* arr = NULL;
-    }
+    Matrix(): size(0), arr(NULL) {}
 
     Matrix(int A) {
         size = A;
-        arr = new int[size * size]();
+        arr = new int[size * size];
         int cnt = size + 1;
+        memset(arr, 0, sizeof(int) * size * size);
         for (int i = 0; i < size * size; i += cnt) {
             arr[i] = 1;
         }
@@ -55,8 +53,9 @@ public:
 
     Matrix(int A, int k) {
         size = A;
-        arr = new int[size * size]();
+        arr = new int[size * size];
         int cnt = size + 1;
+        memset(arr, 0, sizeof(int) * size * size);
         for (int i = 0; i < size * size; i += cnt) {
             arr[i] = k;
         }
@@ -67,6 +66,7 @@ public:
         arr = new int[size * size]();
         int cnt = size + 1;
         int cnt1 = 0;
+        memset(arr, 0, sizeof(int) * size * size);
         for (int i = 0; i < size * size; i += cnt) {
             arr[i] = elements[cnt1];
             cnt1++;
@@ -143,17 +143,17 @@ public:
     }
 
 
-    friend std::ostream& operator<<(std::ostream& out, const Matrix& A) {
+    friend ostream& operator<<(ostream& out, const Matrix& A) {
         for (size_t i = 0; i < A.size; i++) {
             for (size_t j = 0; j < A.size; j++) {
                 out << A.arr[i * A.size + j] << " ";
             }
-            out << std::endl;
+            out << endl;
         }
         return out;
     }
 
-    friend std::ifstream& operator>>(std::ifstream& in, const Matrix& A) {
+    friend ifstream& operator>>(ifstream& in, const Matrix& A) {
         for (size_t i = 0; i < A.size * A.size; i++) {
             in >> A.arr[i];
         }
@@ -164,8 +164,8 @@ public:
 };
 
 int main() {
-    std::ofstream fout("output.txt");
-    std::ifstream fin("input.txt");
+    ofstream fout("output.txt");
+    ifstream fin("input.txt");
 
     int N, k;
 
