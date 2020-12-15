@@ -72,11 +72,6 @@ public:
             }
 
         animals.clear();
-        for (auto f: field)
-        {
-          f.second.clear();
-        }
-        
         field.clear();
     }
     size_t get_new_id() const {
