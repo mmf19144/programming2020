@@ -46,6 +46,7 @@ public:
     int getElement(int n) const {
         if (n >= 0 && n < dimension * dimension)
             return memory[n];
+        throw std::string("ERROR");
     }
     matrix() {
         this->dimension = 0;
