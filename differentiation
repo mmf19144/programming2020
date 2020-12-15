@@ -20,6 +20,7 @@ public:
         return s.c_str();
     }
 
+
 private:
     string s;
 };
@@ -31,7 +32,7 @@ enum TokenType {
 struct Token {
     TokenType type;
     union {
-        double num;
+        int num;
         char variable;
     };
     string str;
@@ -199,7 +200,7 @@ public:
         delete right;
     }
     Expression* diff(char ch) override {
-        return new Add(new Mul(left->diff(ch), right), new Mul(left, right->diff(ch)));
+        return new Add(new Mul(left->diff(ch), right->clone()), new Mul(left->clone(), right->diff(ch)));
     }
     void print() override {
         cout << "(";
@@ -322,6 +323,7 @@ private:
 class Sub : public Expression {
 public:
     Sub(Expression* left, Expression* right) : left(left), right(right) {}
+
     ~Sub() override {
         delete left;
         delete right;
@@ -399,8 +401,8 @@ public:
     }
     Expression* diff(char ch) override {
         return new Div(
-            new Sub(new Mul(left->diff(ch), right), new Mul(left, right->diff(ch))),
-            new Mul(right, right)
+            new Sub(new Mul(left->diff(ch), right->clone()), new Mul(left->clone(), right->diff(ch))),
+            new Mul(right->clone(), right->clone())
         );
     }
     void print() override {
@@ -667,9 +669,12 @@ int main() {
     getline(fin, str);
     try {
         Expression* expression = exp_parse(str);
-        expression->diff('x')->print(fout);
+        Expression* new_exp = expression->diff('x');
+        new_exp->print(fout);
+        delete expression;
+        delete new_exp;
     }
-    catch (MyException myException) {
+    catch (MyException&  myException) {
         cout << myException.what();
     }
     return 0;
