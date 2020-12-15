@@ -205,7 +205,7 @@ matrix operator*(matrix c1, matrix c2) {
     if (c1.getDimension() == c2.getDimension()) {
         int size = c1.getDimension();
         matrix result(size, new int[size] { 0 });
-
+        delete[] a;
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
                 for (int k = 0; k < size; k++) {
