@@ -415,7 +415,7 @@ void Simulation::step() {
 
     cur_step++;
     // moving
-    for (auto *animal: animals) {
+    for (auto animal: animals) {
         if (animal->is_dead())
             continue;
         Point old_position = animal->get_pos();
@@ -467,24 +467,25 @@ void Simulation::step() {
 
 
     // aging and multiplying
-    for (auto *animal: animals) {
-        if (animal->is_dead()) continue;
-        animal->aging();
-        IAnimal *children = animal->multiply();
-        if (children)
-            spawn_animal(children);
-
-        // dying
-        if (animal->must_die()) {
-            Point old_position = animal->get_pos();
-            for (int i = 0; i < field[old_position].size(); i++) {
-                if (field[old_position][i] == animal) {
-                    field[old_position].erase(field[old_position].begin() + i);
-                    break;
+    //for (auto animal: animals) {
+    for (size_t i=0, max = animals.size(); i<max; i++){
+      auto animal = animals[i];  
+      if (animal->is_dead()) continue;
+            animal->aging();
+            IAnimal *children = animal->multiply();
+            if (children)
+                spawn_animal(children);
+            // dying
+            if (animal->must_die()) {
+                Point old_position = animal->get_pos();
+                for (int i = 0; i < field[old_position].size(); i++) {
+                    if (field[old_position][i] == animal) {
+                        field[old_position].erase(field[old_position].begin() + i);
+                        break;
+                    }
                 }
+                animal->dying();
             }
-            animal->dying();
-        }
     }
 }
 
