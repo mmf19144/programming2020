@@ -1,8 +1,8 @@
-#define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
 #include <string>
 #include <stack>
 #include <new>
+#include <fstream>
 
 
 using namespace std;
@@ -11,22 +11,28 @@ using namespace std;
 class Expression {
 public:
     virtual string get_str_expression() const = 0;
-    virtual void print() const = 0;
     virtual Expression* derivate(string _var) const = 0;
-    virtual int eval(string values) = 0;
     virtual Expression* get_better_value() = 0;
+    virtual Expression* copy() = 0;
     virtual bool var_exist() = 0;
+    virtual int eval(string values) = 0;
+    virtual void print(ofstream& output) const = 0;
+    virtual ~Expression() = default;
 };
 
 
-class Number: public Expression {
+class Number : public Expression {
 private:
     int num;
 public:
-    Number(): num(0) {}
+    Number() : num(0) {}
     Number(int value) : num(value) {}
-    void print() const {
-        cout << this->get_str_expression();
+    void print(ofstream& output) const {
+        output << this->get_str_expression();
+    }
+
+    Expression* copy() {
+        return new Number(num);
     }
 
     Expression* derivate(string _var) const {
@@ -60,15 +66,19 @@ public:
 };
 
 
-class Variable: public Expression {
+class Variable : public Expression {
 private:
     string var;
 public:
     Variable() : var("x") {}
-    Variable(string _var): var(_var) {}
+    Variable(string _var) : var(_var) {}
 
-    void print() const {
-        cout << this->get_str_expression();
+    void print(ofstream& output) const {
+        output << this->get_str_expression();
+    }
+
+    Expression* copy() {
+        return new Variable(var);
     }
 
     Expression* derivate(string _var) const {
@@ -85,13 +95,13 @@ public:
             while (values[i] != ' ') {
                 check_var += values[i++];					// reading the name
             }
-            if (check_var == var){
+            if (check_var == var) {
                 i += 4;										// Skipping arrow symbols
                 while (values[i] != ';' && i < values.length())
                     curr_value = curr_value * 10 + (values[i++] - '0'); // converting string to int
                 return curr_value;
             }
-            else{
+            else {
                 for (; values[i] != ';' && i < values.length(); i++);
                 i++;
             }
@@ -113,15 +123,19 @@ public:
 };
 
 
-class Add: public Expression {
+class Add : public Expression {
 private:
-    Expression* left, *right;
+    Expression* left, * right;
 public:
-    Add(): left(nullptr), right(nullptr) {}
-    Add(Expression* _left, Expression* _right): left(_left), right(_right) {}
+    Add() : left(nullptr), right(nullptr) {}
+    Add(Expression* _left, Expression* _right) : left(_left), right(_right) {}
 
-    void print() const {
-        cout << this->get_str_expression();
+    void print(ofstream& output) const {
+        output << this->get_str_expression();
+    }
+
+    Expression* copy() {
+        return new Add(left->copy(), right->copy());
     }
 
     Expression* derivate(string _var) const {
@@ -157,7 +171,7 @@ public:
 };
 
 
-class Sub: public Expression {
+class Sub : public Expression {
 private:
     Expression* left, * right;
 
@@ -165,9 +179,15 @@ public:
     Sub() : left(nullptr), right(nullptr) {}
     Sub(Expression* _left, Expression* _right) : left(_left), right(_right) {}
 
-    void print() const {
-        cout << this->get_str_expression();
+    void print(ofstream& output) const {
+        output << this->get_str_expression();
     }
+
+
+    Expression* copy() {
+        return new Sub(left->copy(), right->copy());
+    }
+
 
     int eval(string values) {
         return left->eval(values) - right->eval(values);
@@ -194,14 +214,14 @@ public:
         return left->var_exist() || right->var_exist();
     }
 
-    ~Sub (){
+    ~Sub() {
         delete left;
         delete right;
     }
 };
 
 
-class Mul: public Expression {
+class Mul : public Expression {
 private:
     Expression* left, * right;
 
@@ -209,16 +229,20 @@ public:
     Mul() : left(nullptr), right(nullptr) {}
     Mul(Expression* _left, Expression* _right) : left(_left), right(_right) {}
 
-    void print() const {
-        cout << this->get_str_expression();
+    void print(ofstream& output) const {
+        output << this->get_str_expression();
     }
 
     int eval(string values) {
         return left->eval(values) * right->eval(values);
     }
 
+    Expression* copy() {
+        return new Mul(left->copy(), right->copy());
+    }
+
     Expression* derivate(string _var) const {
-        return new Add(new Mul(left->derivate(_var), right), new Mul(left, right->derivate(_var)));
+        return new Add(new Mul(left->derivate(_var), right->copy()), new Mul(left->copy(), right->derivate(_var)));
     }
 
     string get_str_expression() const {
@@ -245,14 +269,14 @@ public:
         return left->var_exist() || right->var_exist();
     }
 
-    ~Mul (){
+    ~Mul() {
         delete left;
         delete right;
     }
 };
 
 
-class Div: public Expression {
+class Div : public Expression {
 private:
     Expression* left, * right;
 
@@ -260,16 +284,20 @@ public:
     Div() : left(nullptr), right(nullptr) {}
     Div(Expression* _left, Expression* _right) : left(_left), right(_right) {}
 
-    void print() const {
-        cout << this->get_str_expression();
+    void print(ofstream& output) const {
+        output << this->get_str_expression();
     }
 
     int eval(string values) {
         return left->eval(values) / right->eval(values);
     }
 
+    Expression* copy() {
+        return new Div(left->copy(), right->copy());
+    }
+
     Expression* derivate(string _var) const {
-        return new Div(new Sub(new Mul(left->derivate(_var), right), new Mul(left, right->derivate(_var))), new Mul(right, right));
+        return new Div(new Sub(new Mul(left->derivate(_var), right->copy()), new Mul(left->copy(), right->derivate(_var))), new Mul(right, right));
     }
 
     string get_str_expression() const {
@@ -308,41 +336,41 @@ string get_postfix(string input_data) {
     int priority = 0;
     for (int i = 0; i < input_data.length(); i++) {
         switch (input_data[i]) {
-            case ' ': break;
+        case ' ': break;
 
-            case '(':
-                operations.push('(');
-                number_before = false;
-                break;
+        case '(':
+            operations.push('(');
+            number_before = false;
+            break;
 
-            case ')':
-                while (operations.top() != '(') {
-                    postfix = postfix + ' ' + operations.top();
-                    operations.pop();
-                }
+        case ')':
+            while (operations.top() != '(') {
+                postfix = postfix + ' ' + operations.top();
                 operations.pop();
-                break;
+            }
+            operations.pop();
+            break;
 
-            case '-':
-                if (!number_before) {
-                    postfix += '0';
-                }
-            case '+':
-            case '*':
-            case '/':
-                priority = get_priority(input_data[i]);
-                while (!operations.empty() && priority <= get_priority(operations.top())) {
-                    postfix = postfix + ' ' + operations.top();
-                }
-                postfix = postfix + ' ';
-                operations.push(input_data[i]);
-                number_before = false;
-                break;
+        case '-':
+            if (!number_before) {
+                postfix += '0';
+            }
+        case '+':
+        case '*':
+        case '/':
+            priority = get_priority(input_data[i]);
+            while (!operations.empty() && priority <= get_priority(operations.top())) {
+                postfix = postfix + ' ' + operations.top();
+            }
+            postfix = postfix + ' ';
+            operations.push(input_data[i]);
+            number_before = false;
+            break;
 
-            default:
-                postfix = postfix + input_data[i];
-                number_before = true;
-                break;
+        default:
+            postfix = postfix + input_data[i];
+            number_before = true;
+            break;
         }
     }
     while (!operations.empty()) {
@@ -379,26 +407,26 @@ Expression* generate_expression(string postfix) {
             values.push(new_exp);
         }
         else {
-            Expression *exp2 = values.top();
+            Expression* exp2 = values.top();
             values.pop();
             Expression* exp1 = values.top();
             values.pop();
             switch (postfix[i]) {
-                case '+':
-                    values.push(new Add(exp1, exp2));
-                    break;
+            case '+':
+                values.push(new Add(exp1, exp2));
+                break;
 
-                case '-':
-                    values.push(new Sub(exp1, exp2));
-                    break;
+            case '-':
+                values.push(new Sub(exp1, exp2));
+                break;
 
-                case '*':
-                    values.push(new Mul(exp1, exp2));
-                    break;
+            case '*':
+                values.push(new Mul(exp1, exp2));
+                break;
 
-                case '/':
-                    values.push(new Div(exp1, exp2));
-                    break;
+            case '/':
+                values.push(new Div(exp1, exp2));
+                break;
             }
             i++;
         }
@@ -407,8 +435,8 @@ Expression* generate_expression(string postfix) {
 }
 
 
-Expression* make_this_better(Expression *bad_expression) {
-    if (!bad_expression->var_exist()) {				// checking for variable
+Expression* make_this_better(Expression* bad_expression) {
+    if (!bad_expression->var_exist()) {				  // checking for variable
         return new Number(bad_expression->eval(""));  // calculating if no variables
     }
     Expression* better_expression = bad_expression->get_better_value();
@@ -421,12 +449,17 @@ Expression* make_this_better(Expression *bad_expression) {
 
 
 int main() {
+    ifstream input("input.txt");
+    ofstream output("output.txt");
     string input_data;
-    cin >> input_data;
+    input >> input_data;
     if (input_data == "")
         throw("dude seriously");
     input_data = get_postfix(input_data);
-    Expression *ready_expression = generate_expression(input_data);
-    make_this_better(ready_expression->derivate("x"))->print();
+    Expression* ready_expression = generate_expression(input_data);
+    Expression* der_exp = ready_expression->derivate("x");
+    der_exp->print(output);
+    delete der_exp;
+    delete ready_expression;
     return 0;
 }
