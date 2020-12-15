@@ -176,7 +176,7 @@ matrix operator+(matrix c1, matrix c2) {
         int size = c1.getDimension();
         int* a = new int[size] { 0 };
         matrix result(size, a);
-        delete a;
+        delete a[];
 
         for (int i = 0; i < size * size; i++) {
             result.memory[i] = c1.memory[i] + c2.memory[i];
@@ -191,7 +191,7 @@ matrix operator-(matrix c1, matrix c2) {
         int size = c1.getDimension();
         int* a = new int[size] { 0 };
         matrix result(size, a);
-        delete a;
+        delete a[];
 
         for (int i = 0; i < size * size; i++) {
             result.memory[i] = c1.memory[i] - c2.memory[i];
@@ -243,7 +243,7 @@ matrix operator+(matrix c1) {
 
     int* a = new int[size] { 0 };
     matrix trans(size, a);
-    delete a;
+    delete a[];
 
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++)
@@ -271,7 +271,7 @@ int main() {
     matrix C(N);
     matrix D(N);
     matrix K(N, diag);
-    delete diag;
+    delete diag[];
 
     fin >> A >> B >> C >> D;
 
