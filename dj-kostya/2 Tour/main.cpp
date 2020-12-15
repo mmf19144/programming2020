@@ -28,6 +28,8 @@ class IAnimal {
 public:
     int selectedInStep = -1;
 
+    virtual ~IAnimal() = default;
+    
     virtual Point move() = 0;
 
     virtual Point get_pos() = 0;
@@ -68,8 +70,12 @@ public:
         animals.clear();
         for (auto f: field)
         {
+            for (auto g: f.second){
+              delete g;
+            }
             f.second.clear();
         }
+        
         field.clear();
     }
     size_t get_new_id() const {
@@ -177,19 +183,19 @@ protected:
 
 public:
 
-    explicit BaseAnimal(BaseAnimal *parent) : id(sim.get_new_id()),
-                                              parent_id(parent->id),
-                                              x(parent->x),
+    explicit BaseAnimal(BaseAnimal *parent) : x(parent->x),
                                               y(parent->y),
-                                              sim(parent->sim),
-                                              birth_step(sim.get_current_step()),
-                                              constancy(parent->constancy),
-                                              rot(parent->rot),
-                                              is_die(false),
                                               speed(parent->speed),
                                               max_age(parent->max_age),
+                                              constancy(parent->constancy),
+                                              rot(parent->rot),
+                                              type(parent->type),
+                                              sim(parent->sim),
                                               is_root_parent(false),
-                                              type(parent->type) {}
+                                              id(sim.get_new_id()),
+                                              parent_id(parent->id),
+                                              birth_step(sim.get_current_step()),
+                                              is_die(false){}
 
     BaseAnimal(size_t x_,
                size_t y_,
@@ -198,19 +204,19 @@ public:
                const size_t animal_speed,
                const size_t animal_max_age,
                const AnimalType type_,
-               Simulation &sim_) : id(sim_.get_new_id()),
-                                   parent_id(-1),
-                                   x(x_),
+               Simulation &sim_) : x(x_),
                                    y(y_),
-                                   sim(sim_),
-                                   birth_step(0),
-                                   constancy(constancy_),
-                                   rot(start_rot),
-                                   is_die(false),
                                    speed(animal_speed),
                                    max_age(animal_max_age),
+                                   constancy(constancy_),
+                                   rot(start_rot),
+                                   type(type_),
+                                   sim(sim_),
                                    is_root_parent(true),
-                                   type(type_) {}
+                                   id(sim.get_new_id()),
+                                   parent_id(-1),
+                                   birth_step(sim.get_current_step()),
+                                   is_die(false){}
 
     Point get_pos() override {
         return {y, x};
