@@ -1,0 +1,263 @@
+#include <iostream>
+#include <fstream>
+
+class Matrix {
+private:
+	size_t size;
+	int** arr;
+public:
+	Matrix()
+		:size(0), arr(nullptr) {}
+
+	Matrix(int size)
+		:size(size) {
+		arr = new int* [size];
+		for (size_t k = 0; k < size; k++) {
+			arr[k] = new int[size];
+		}
+
+		for (size_t i = 0; i < size; i++) {
+			for (size_t j = 0; j < size; j++) {
+				if (i == j) {
+					arr[i][j] = 1;
+				}
+				else {
+					arr[i][j] = 0;
+				}
+			}
+		}
+
+	}
+
+	Matrix(size_t size, int* diag)
+		:size(size) {
+		arr = new int* [size];
+		for (size_t k = 0; k < size; k++) {
+			arr[k] = new int[size];
+		}
+
+		for (size_t i = 0; i < size; i++) {
+			for (size_t j = 0; j < size; j++) {
+				arr[i][j] = 0;
+			}
+		}
+
+		for (size_t k = 0; k < size; k++) {
+			arr[k][k] = diag[k];
+		}
+
+	}
+
+	Matrix(const Matrix& A) : size{ A.size }
+	{
+		arr = new int* [size];
+		for (size_t i = 0; i < size; i++)
+		{
+			arr[i] = new int[size];
+		}
+		for (size_t i = 0; i < size; i++) {
+			for (size_t j = 0; j < size; j++) {
+				arr[i][j] = A.arr[i][j];
+			}
+		}
+	}
+
+	~Matrix() {
+		if (size > 0) {
+			for (size_t i = 0; i < size; i++) {
+				delete[] arr[i];
+			}
+			delete[] arr;
+		}
+	}
+
+	const Matrix operator + (const Matrix& b) const {
+		if (size == b.size) {
+			Matrix c(size);
+
+			for (size_t i = 0; i < size; i++) {
+				for (size_t j = 0; j < size; j++) {
+					c.arr[i][j] = arr[i][j] + b.arr[i][j];
+				}
+			}
+			return c;
+		}
+		else {
+			throw "Size_Error";
+		}
+	}
+
+	const Matrix operator - (const Matrix& b) const {
+		if (size == b.size) {
+			Matrix c(size);
+
+			for (size_t i = 0; i < size; i++) {
+				for (size_t j = 0; j < size; j++) {
+					c.arr[i][j] = arr[i][j] - b.arr[i][j];
+				}
+			}
+			return c;
+		}
+		else {
+			throw "Size_Error";
+		}
+	}
+
+	const Matrix operator * (const Matrix& b) const {
+		if (size == b.size) {
+			Matrix c(size);
+
+			int buf = 0;
+			for (size_t i = 0; i < size; i++) {
+				for (size_t j = 0; j < size; j++) {
+					buf = 0;
+					for (size_t k = 0; k < size; k++) {
+						buf += arr[i][k] * b.arr[k][j];
+					}
+					c.arr[i][j] = buf;
+				}
+			}
+			return c;
+		}
+		else {
+			throw ("Size_Error");
+		}
+	}
+
+	const bool operator == (const Matrix& b) const {
+		if (size == b.size) {
+			int count = 0;
+			for (size_t i = 0; i < size; i++) {
+				for (size_t j = 0; j < size; j++) {
+					if (arr[i][j] == b.arr[i][j]) {
+						count++;
+					}
+				}
+			}
+			if (count == ((size) * (size))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	const Matrix operator ! () const {//транспонирование
+		Matrix c(size);
+		for (size_t i = 0; i < size; i++) {
+			for (size_t j = 0; j < size; j++) {
+				c.arr[i][j] = arr[j][i];
+			}
+		}
+		return c;
+	}
+
+	const Matrix Minor(size_t idx1, size_t idx2) {
+		if (idx1 <= size || idx2 <= size) {
+			Matrix c(size--);
+			for (size_t i = 0; i < c.size; i++) {
+				for (size_t j = 0; j < c.size; j++) {
+					if (i < idx1 && j < idx2) {
+						c.arr[i][j] = arr[i][j];
+					}
+					if (i < idx1 && j > idx2) {
+						c.arr[i][j - 1] = arr[i][j];
+					}
+					if (i > idx1&& j < idx2) {
+						c.arr[i - 1][j] = arr[i][j];
+					}
+					if (i > idx1&& j > idx2) {
+						c.arr[i - 1][j - 1] = arr[i][j];
+					}
+				}
+			}
+		}
+		else {
+			throw("Index_Error");
+		}
+
+	}
+
+	friend std::ostream& operator<<(std::ostream& out, const Matrix& A)
+	{
+		for (size_t i = 0; i < A.size; i++)
+		{
+			for (size_t j = 0; j < A.size; j++)
+			{
+				out << A.arr[i][j] << " ";
+			}
+			out << std::endl;
+		}
+		return out;
+	}
+
+	friend std::istream& operator>>(std::istream& in, Matrix& A)
+	{
+		for (size_t i = 0; i < A.size; i++)
+		{
+			for (size_t j = 0; j < A.size; j++)
+			{
+				in >> A.arr[i][j];
+			}
+		}
+		return in;
+	}
+
+	void Print (std::ostream& out) const {
+		for (size_t i = 0; i < size; i++){
+			for (size_t j = 0; j < size; j++){
+				out << arr[i][j] << " ";
+			}
+			out << std::endl;
+		}
+	}
+
+	void Scan(std::istream& in)
+	{
+		for (size_t i = 0; i < size; i++)
+		{
+			for (size_t j = 0; j < size; j++)
+			{
+				in >> arr[i][j];
+			}
+		}
+	}
+
+};
+
+
+int main() {
+
+	std::ifstream fin{ "input.txt" };
+	std::ofstream fout{ "output.txt" };
+
+	try {
+		size_t size;
+		fin >> size;
+
+		int k;
+		fin >> k;
+
+		int* k_diag = new int[size];
+		for (size_t i = 0; i < size; i++) {
+			k_diag[i] = k;
+		}
+
+		Matrix A(size);
+		Matrix B(size);
+		Matrix C(size);
+		Matrix D(size);
+		Matrix K(size, k_diag);
+		A.Scan(fin);
+		B.Scan(fin);
+		C.Scan(fin);
+		D.Scan(fin);
+
+		((A + (B * (!C)) + K) * (!D)).Print(fout);
+	}
+
+	catch (char* str) {
+		fout << str;
+	}
+
+	return 0;
+}
