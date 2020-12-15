@@ -67,13 +67,14 @@ public:
     }
 
     ~Simulation(){
+        for (auto g: animals){
+              delete g;
+            }
+
         animals.clear();
         for (auto f: field)
         {
-            for (auto g: f.second){
-              delete g;
-            }
-            f.second.clear();
+          f.second.clear();
         }
         
         field.clear();
