@@ -1,372 +1,222 @@
-
-
 #include <iostream>
 #include <fstream>
 #include <cstdio>
 #include <stdio.h>
-#include <vector>
-
 using namespace std;
-struct Coord{
-    int x;
-    int y;
-};
-
-class Animal{
-protected:
-    Coord cord;
-    int dir;
-    int stab;
-    int age;
-    int feed;
-    int birthtime;
-    int type;
-public:
-    Animal(){
-        this->cord.x = 0;
-        this->cord.y = 0;
-        this->dir = 0;
-        this->stab = 0;
-        this->age = 0;
-        this->birthtime = 0;
-        this->type = 0;
-        this->feed =0 ;
-    }
-
-    ~Animal(){
-
-    }
-    Animal( int c1,int c2 , int di, int st,int btime) {
-        this->cord.x = c1;
-        this->cord.y = c2;
-        this->dir = di;
-        this->stab = st;
-        this->birthtime = btime;
-        this->age = 0;
-        this->feed = 0;
-
-    }
-    virtual void Move (int N,int M){}
-    virtual void eat(){}
-    virtual void duplicate(){}
-
-    Coord getcord(){
-        return this->cord;
-    }
-    int getdir(){
-        return this->dir;
-    }
-    int getstab(){
-        return this->stab;
-    }
-    int getage() {
-        return this->age;
-    }
-    int getfeed(){
-        return this->feed;
-    }
-    int getbirthtime(){
-        return this->birthtime;
-    }
-    int gettype(){
-        return this->type;
-    }
-};
 
 
-
-class Wolf : public Animal{
+class Matrix {
+    int *data;
+    int dim;
 
 public:
-    Wolf():  Animal(){
+    //friend std::istream& operator>>(std::istream& in, Matrix& m);
+    //friend std::ostream& operator<<(std::ostream& out, Matrix& m);
 
-        this->type = 1;
+
+
+    Matrix():
+            dim(0), data(nullptr){
     }
-
-    Wolf(int c1,int c2 , int di, int st,int btime): Animal(c1,c2,di,st,btime){
-        this->type = 1;
-        this->feed =0;
-    }
-
-    void Move(int b1,int b2) override{
-        if (this ->dir ==0){
-            if (this->cord.x>=2){this->cord.x = this->cord.x - 2;}
-            else { this->cord.x = (this->cord.x-2)+b1;}
-        }
-        if (this ->dir ==1){
-            if (this->cord.y<=(b1-1)-2){this->cord.y = this->cord.y + 2;}
-            else { this->cord.y = (this->cord.y+2)-b2;}
-        }
-        if (this ->dir ==2){
-            if (this->cord.x<=(b1-1)-2){this->cord.x = this->cord.x + 2;}
-            else { this->cord.x = (this->cord.x+2)-b1;}
-        }
-        if (this ->dir ==3){
-            if (this->cord.y>=2){this->cord.y = this->cord.y - 2;}
-            else { this->cord.y = (this->cord.x+2)+b2;}
-        }
-
-        this->age+=1;
-
-        if (this->age % this->stab == 0) this->dir +=1;
-        if (this->dir == 4) this->dir = 0;
+    ~Matrix() {
+        delete[] data;
 
     }
 
-    void eat() override{
+    Matrix(int num, bool singular = true) {
+        this->dim = num;
 
-        this->feed += 1;
+        this->data = new int[num * num];
 
-    }
-    void duplicate() override {
-        this->feed=0;
-    }
-};
-
-
-
-class Rabbit: public Animal{
-public:
-    Rabbit(): Animal(){
-        this->type=-1;
-    }
-
-    Rabbit(int c1,int c2 , int di, int st,int btime): Animal(c1,c2,di,st,btime){
-        this->type = -1;
-    }
-    void Move(int b1,int b2) override{
-        if (this ->dir ==0){
-            if (this->cord.x>=1){this->cord.x = this->cord.x - 1;}
-            else { this->cord.x = (this->cord.x-1)+b2;}
-        }
-        if (this ->dir ==1){
-            if (this->cord.y<=(b2-1)-1){this->cord.y = this->cord.y + 1;}
-            else { this->cord.y = (this->cord.y+1)-b2;}
-        }
-        if (this ->dir ==2){
-            if (this->cord.x<=(b1-1)-1){this->cord.x = this->cord.x + 1;}
-            else { this->cord.x = (this->cord.x+1)-b1;}
-        }
-        if (this ->dir ==3){
-            if (this->cord.y>=1){this->cord.y = this->cord.y - 1;}
-            else { this->cord.y = (this->cord.y-1)+b2;}
-        }
-
-        this->age+=1;
-
-        if (this->age % this->stab == 0) this->dir +=1;
-        if (this->dir == 4) this->dir = 0;
-    }
-
-};
-
-class Simulation: public Wolf,public Rabbit {
-public:
-    const int xsize;
-    const int ysize;
-    vector<Animal *> *table;
-public:
-    Simulation( int WN, int RN, int x_size, int y_size, Coord *wC, int *wD, int *wS, //�������� �����
-                Coord *rC, int *rD, int *rS) : xsize(x_size), ysize(y_size),
-                                               table(new vector<Animal *>[x_size * y_size]) {
-
-        for (size_t x = 0; x < x_size; x++) {
-            for (size_t y = 0; y < y_size; y++) {
-                table[y + x * y_size].clear();
-            }
-        }
-        for (int i = 0; i < WN; i++) {
-            Wolf *wolf = new Wolf(wC[i].x, wC[i].y, wD[i], wS[i], 0);
-            table[wC[i].x + xsize * wC[i].y].emplace_back(wolf);
-
-        }
-        for (int i = 0; i < RN; i++) {
-            Rabbit *rabb = new Rabbit(rC[i].x, rC[i].y, rD[i], rS[i], 0);
-            table[rC[i].x + rC[i].y * xsize].emplace_back(rabb);
-        }
-
-    }
-
-    void print_table(std::ostream &out){   //�������� �����
-        int nw = 0;
-        int nr = 0;
-
-        for (int i = 0; i < ysize; i++) {
-            for (int j = 0; j < xsize; j++) {
-                for (int k = 0; k < table[j * ysize + i].size(); k++) {
-                    if (table[j * ysize + i][k] == nullptr) continue;
-                    if (table[j * ysize + i][k]->gettype()==-1) {nr +=1; }
-                    if (table[j * ysize + i][k]->gettype()== 1) {nw -=1; }
+        for (int i = 0; i < num; i++) {
+            for (int j = 0; j < num; j++) {
+                if (singular) {
+                    if (i == j) { this->data[i * num + i] = 1; }
                 }
-                if (nw != 0){out << nw;}
-                if (nr != 0){out<<nr;}
-                if(nw==0 && nr==0) out << "#";
-                nr=0;
-                nw=0;
+                this->data[i * num + j] = 0;
             }
-            out << endl;
+        }
+        //for (int i = 0; i < num; i++) { this->data[i][i] = 1; }
+    }
+
+    Matrix(int num, int const *arr) {
+        this->dim = num;
+        this->data = new int[num*num];
+
+        for (int i = 0; i < num; i++) {
+            for (int j = 0; j < num; j++) {
+                this->data[i * num + j] = 0;
+            }
+        }
+        for (int i = 0; i < num; i++) {
+            this->data[i * num + i] = arr[i];
         }
     }
 
-    void run_simulation(int all_time,std::ostream &out){
-        for(int i = 0;i<all_time;i++){
+    Matrix(int num, int de) {
+        this->dim = num;
+        this->data = new int[num*num];
 
-            Moving(i);
-
-            eat_animals();
-
-            make_animals(i+1);
-
-            kill_animals();
-
+        for (int i = 0; i < num; i++) {
+            for (int j = 0; j < num; j++) {
+                this->data[i * num + j] = 0;
+            }
         }
-
-        print_table(out);
+        for (int i = 0; i < num; i++) {
+            this->data[i * num + i] = de;
+        }
     }
 
 
-    void Moving(int time) {
-        for (int i = 0; i < xsize; i++) {
-            for (int j = 0; j < ysize; j++) {
-                for (int k = 0; k < table[j * xsize + i].size(); k++) {
 
-                    if (table[j * xsize + i][k] != nullptr) {
+    Matrix operator+(const Matrix &that) const {
+        if (this->dim != that.dim) {
+            throw std::invalid_argument("Matrices a and b must have the same dimensions");
+        }
+        Matrix result(this->dim);
+        for (int i = 0; i < this->dim; i++) {
+            for (int j = 0; j < this->dim; j++) {
+                result.data[i * this->dim + j] = this->data[i * this->dim + j] + that.data[i * this->dim + j];
+            }
+        }
+        return result;
+    }
 
-                        if (table[j * xsize + i][k]->getage() == time - table[j * xsize + i][k]->getbirthtime()) {
+    Matrix operator-(const Matrix &that) const {
+        if (this->dim != that.dim) {
+            throw std::invalid_argument("Matrices a and b must have the same dimensions");
+        }
+        Matrix result(this->dim);
+        for (int i = 0; i < this->dim; i++) {
+            for (int j = 0; j < this->dim; j++) {
+                result.data[i * this->dim + j] = this->data[i * this->dim + j] - that.data[i * this->dim + j];
+            }
+        }
+        return result;
+    }
 
-                            Coord oldcords = table[j * xsize + i][k]->getcord();
-                            table[j * xsize + i][k]->Move(xsize, ysize);
-                            Coord newcords = table[j * xsize + i][k]->getcord();
+    Matrix operator*(const Matrix &that) const {
+        Matrix result(this->dim, false);
+        if (this->dim != that.dim) {
+            throw std::invalid_argument("Matrices a and b must have the same dimensions");
+        }
 
-                            if (newcords.x == oldcords.x && newcords.y == oldcords.y) continue;
-                            else {
-                                table[newcords.y * xsize + newcords.x].emplace_back(table[j * xsize + i][k]);
-                                table[j * xsize + i][k] = nullptr;
-                            }
-                        } else continue;
-                    }
+        for (int i = 0; i < this->dim; i++) {
+            for (int j = 0; j < this->dim; j++) {
+                for (int k = 0; k < this->dim; k++) {
+                    result.data[i * this->dim + j] += this->data[i * this->dim + k] * that.data[k * this->dim + j];
                 }
             }
         }
-    }
-
-    static  Animal *find_eldest_wolf(vector<Animal *> &animals) {
-        int max_id = -1;
-        if (animals.empty()) return nullptr;
-        for (size_t id = 0; id < animals.size(); id++) {
-            if (animals[id] == nullptr) continue;
-            if (animals[id]->gettype() == 1) {
-                max_id = id;
-                break;
-            }
-
-        }
-
-        if (max_id ==-1) return nullptr;
-        for (size_t id = max_id + 1; id < animals.size(); id++) {
-            if (animals[id] == nullptr) continue;
-            if (animals[id]->gettype() == 1 && animals[id]->getage() > animals[max_id]->getage()) {
-                max_id = id;
-            }
-        }
-
-        return animals[max_id];
-
+        return result;
     }
 
 
-    void eat_animals() {
 
-        for (int i = 0; i < xsize; i++) {
-            for (int j = 0; j < ysize; j++) {
+    Matrix operator!() const {
+        Matrix result(this->dim);
+        for (int i = 0; i < this->dim; i++) {
+            for (int j = 0; j < this->dim; j++) {
+                result.data[i * this->dim + j] = this->data[j * this->dim + i];
+            }
+        }
+        return result;
+    }
 
-                Animal *eldestW = find_eldest_wolf(table[j * xsize + i]);
+    Matrix operator()(int r, int c) {
+        Matrix result((this->dim) - 1, false);
+        int minor_row, minor_col;
 
-                if (eldestW != nullptr) {
-                    for (int k = 0; k < table[j * xsize + i].size(); k++) {
-                        if (table[j * xsize + i][k] == nullptr) continue;
-                        if (table[j * xsize + i][k]->gettype() == -1) {
-                            eldestW->eat();
-                            delete (table[j * xsize + i][k]);
-                            table[j * xsize + i][k] = nullptr;
-                        }
-                    }
-                }
-                else continue;
+        for (int i = 0; i < this-> dim; i++) {
+            minor_row = i;
+            if (i > r)
+                minor_row--;
+            for (int j = 0; j < this->dim; j++) {
+                minor_col = j;
+                if (j > c)
+                    minor_col--;
+                if (i != r && j != c)
+                    result.data[minor_row * this->dim + minor_col] = this->data[i * this->dim + j];
+            }
+        }
+        return result;
+    }
 
+    void readMatrix(std::ifstream &is, Matrix &m) {
+        for (int i = 0; i < m.dim; i++) {
+            for (int j = 0; j < m.dim; j++) {
+                is >> m.data[i * m.dim + j];
             }
         }
     }
 
-    void make_animals(int time) {
-        for (int i = 0; i < ysize; i++) {
-            for (int j = 0; j < xsize; j++) {
-                for(int k=0;k<table[j * ysize + i].size();k++){
-                    if (table[j * ysize + i][k]== nullptr) continue;
-                    if (table[j * ysize + i][k]->gettype() == -1 && (table[j * ysize + i][k]->getage()==5 ||
-                                                                     table[j * ysize + i][k]->getage() == 10)) {
-                        Rabbit *rabb = new Rabbit(i, j, table[j * ysize + i][k]->getdir(),
-                                                  table[j * ysize + i][k]->getstab(), time);
-                        table[j * ysize + i].emplace_back(rabb);
-                    }
-                    else  if (table[j * ysize + i][k]->gettype() == 1 && table[j * ysize + i][k]->getfeed()>=2){
-                        Wolf * wolf = new Wolf(i,j,table[j * ysize + i][k]->getdir(),table[j * ysize + i][k]->getstab(), time);
-                        table[j * ysize + i][k]->duplicate();
-                        table[j*ysize+i].emplace_back(wolf);
-                    }
-                }
-
+    void writeMatrix(std::ofstream &os, Matrix &m) {
+        for (int i = 0; i < m.dim; i++) {
+            for (int j = 0; j < m.dim; j++) {
+                os << m.data[i * m.dim + j]<< " " ;
             }
+            os << endl;
         }
     }
-
-    void kill_animals() {
-        for (int i = 0; i < ysize; i++) {
-            for (int j = 0; j < xsize; j++) {
-                for (int k = 0; k < table[j * ysize + i].size(); k++) {
-                    if (table[j * ysize + i][k] == nullptr) continue;
-                    if (table[j * ysize + i][k]->gettype() == -1 && table[j * ysize + i][k]->getage() == 10) {
-                        delete (table[j * ysize + i][k]);
-                        table[j * ysize + i][k] = nullptr;
-                        continue;
-                    }
-                    if (table[j * ysize + i][k]->gettype() == 1 && table[j * ysize + i][k]->getage() == 15) {
-                        delete (table[j * ysize + i][k]);
-                        table[j * ysize + i][k] = nullptr;
-                        continue;
-                    }
-                }
-            }
-
+    friend std::ostream& operator<< (std::ostream &out, Matrix& m) {
+        //int size = c1.dim;
+        for (int i = 0; i < m.dim; i++) {
+            for (int j = 0; j < m.dim; j++)
+                out << m.data[i*m.dim + j] << " ";
+            out << std::endl;
         }
+
+        return out;
     }
+
+    friend std::istream& operator>>(std::istream &in, Matrix& m) {
+        //int size = c1.getDimension();
+        for (int i = 0; i < m.dim; i++) {
+            for (int j = 0; j < m.dim; j++)
+                in >>m.data[i*m.dim+j];
+        }
+
+        return in;
+    }
+
 };
 
-int main(){
+
+
+int main() {
+
+
     ifstream fin("input.txt");
+
+    int msize, k;
+
+    fin >> msize >> k;
+
+    Matrix A(msize);
+    Matrix B(msize);
+    Matrix C(msize);
+    Matrix D(msize);
+    Matrix K(msize, k);
+
+
     ofstream fout("output.txt");
-    int N,M,T,R,W;
-    fin >> N >> M >>T >> R >> W;
-    Coord* rabbits_cord = new Coord[R];
-    int* rabbits_dir = new int[R];
-    int* rabbits_st = new int[R];
-
-    Coord* wolves_cord = new Coord[W];
-    int* wolves_dir = new int[W];
-    int* wolves_st = new int[W];
-
-    for(int i =0; i<R;i++){
-        fin >> rabbits_cord[i].y >> rabbits_cord[i].x >> rabbits_dir[i] >> rabbits_st[i];
-    }
-    for (int i = 0;i<W;i++){
-        fin >> wolves_cord[i].y >> wolves_cord[i].x >> wolves_dir[i] >> wolves_st[i];
-    }
 
 
 
-    Simulation simulation(W,R,N,M,wolves_cord,wolves_dir,wolves_st,rabbits_cord,rabbits_dir,rabbits_st);
-    simulation.run_simulation(T,fout);
+
+    Matrix R = (A + B * (!C) + K) * (!D);
+
+
+    fin >> A >> B >> C >> D;
+
+    Matrix example_result = ((A + B * (!C) + K) * (!D));
+
+    fout << example_result;
+
+    fin.close();
+    fout.close();
 
     return 0;
-}
 
+
+}
