@@ -1,0 +1,137 @@
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <set>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <cstring>
+#include <chrono>
+#include <regex>
+#include <atomic>
+
+using namespace std;
+
+mutex mutex_lock;
+string start_directory = "C:\\Users\\taras\\CLionProjects\\programming2020\\Александр Тарасенко\\test_data\\";
+string finish_directory = "C:\\Users\\taras\\CLionProjects\\programming2020\\Александр Тарасенко\\copy_data\\";
+queue <string> for_checking;
+set <string> finish_their_life;
+
+class Parser {
+private:
+    atomic <int> started_parsing;
+    atomic <int> finish_parsing;
+    string start_file;
+    int num_thread = 0;
+    int parsing_time;
+
+    void add_new_parsing_files(string filename) {
+        lock_guard<mutex> lockGuard(mutex_lock);
+        for_checking.push(filename);
+    }
+
+    void start_parsing_file(string file) {
+        vector<string> found_parsing_files;
+        string file_line;
+        regex find_pattern("(<a href=\"file://[a-za-z0-9.]+html\">)");
+        ifstream fin(start_directory + file);
+        ofstream fout(finish_directory + file);
+        while (getline(fin, file_line)) {
+            smatch tag_match;
+            fout << file_line << endl;
+            while (regex_search(file_line, tag_match, find_pattern)) {
+                string tag = tag_match.str();
+                smatch curr_file;
+                regex parsing_name_pattern("([a-za-z0-9.]+html)");
+                regex_search(tag, curr_file, parsing_name_pattern);
+                file_line = tag_match.suffix().str();
+                found_parsing_files.push_back(curr_file.str());
+            }
+        }
+        fin.close();
+        fout.close();
+        for (auto i : found_parsing_files)
+            add_new_parsing_files(i);
+        lock_guard<mutex> lockGuard(mutex_lock);
+        finish_their_life.insert(file);
+    }
+
+
+    string get_new_file() {
+        string new_file = "";
+        lock_guard<mutex> guard(mutex_lock);
+        if (!for_checking.empty()) {
+            new_file = for_checking.front();
+            for_checking.pop();
+        }
+        return new_file;
+    }
+
+
+    bool check_probably_end() {
+        return finish_parsing == started_parsing;
+    }
+
+
+    void add_parsing_worker() {
+        bool stop_parsing = false;
+        while (!stop_parsing) {
+            stop_parsing = check_probably_end();
+            string filename = get_new_file();
+            if (filename != "") {
+                unique_lock <mutex> lock(mutex_lock);
+                if (!finish_their_life.count(filename)) {
+                    lock.unlock();
+                    started_parsing++;
+                    start_parsing_file(filename);
+                    finish_parsing++;
+                }
+                stop_parsing = false;
+            }
+        }
+    }
+public:
+    Parser(int num, string start) : num_thread(num), start_file(start) {
+        for_checking.push(start);
+    }
+
+    Parser(ifstream& fin) {
+        fin >> start_file >> num_thread;
+        for_checking.push(start_file);
+    }
+
+    void start_work() {
+        parsing_time = 0;
+        finish_their_life.clear();
+        started_parsing = finish_parsing = 0;
+        chrono::time_point<chrono::system_clock> start = chrono::system_clock::now();
+        vector <thread> workers;
+        for (int i = 0; i < num_thread; ++i)
+            workers.push_back(thread(&Parser::add_parsing_worker, ref(*this)));
+        for (int i = 0; i < num_thread; ++i) {
+            workers[i].join();
+        }
+        chrono::time_point<chrono::system_clock> end = chrono::system_clock::now();
+        parsing_time = chrono::duration_cast<chrono::microseconds>(end - start).count();
+    }
+
+    int get_parsing_time() {
+        return parsing_time;
+    }
+
+    int get_number_checked_files() {
+        return finish_their_life.size();
+    }
+};
+
+int main() {
+    ifstream fin("input.txt");
+    ofstream fout("output.txt");
+    Parser crawler(fin);
+    crawler.start_work();
+    fout << crawler.get_number_checked_files() << " " << crawler.get_parsing_time() << " microseconds";
+    fin.close();
+    fout.close();
+    return 0;
+}
