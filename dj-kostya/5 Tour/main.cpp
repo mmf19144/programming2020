@@ -1,25 +1,16 @@
 #include <iostream>
 #include <fstream>
 #include <regex>
-#include <exception>
 #include <vector>
 #include <queue>
 #include <mutex>
 #include <thread>
 #include <chrono>
-#include <condition_variable>
 #include <utility>
 #include <unordered_set>
 
 using namespace std;
 
-
-/*
- * For i9 with 8-threads (2,3) 16 threads are optimal
- */
-
-
-//#define DEBUG
 
 string ROOT_DIR = "test_data";
 
@@ -141,21 +132,19 @@ void UrlJob::Execute() {
 #ifdef DEBUG
     cout << href << endl;
 #endif
-    const regex regexp("<a[^>]* href=\"([^<]+)\"[^>]*>");
-    smatch result;
     if (href.empty())
         return;
 
     string body = getBodyByHref();
 
-    while (regex_search(body, result, regexp)) {
-        string newHref = result.str(1);
-        if (newHref.empty()) {
-            body = result.suffix().str();
-            continue;
+    for (size_t i = 0; i < body.size(); i++) {
+        if (body[i] == '<' && i + 10 < body.size()) {
+            string token = body.substr(i + 1, body.find('<', i + 1) - 1);
+            if (token.length() > 0 && token[0] == 'a' && token.substr(2, 6) == "href=\"") {
+                token = token.substr(8, token.find('>', 8) - 9);
+                q.Push(std::make_unique<UrlJob>(token));
+            }
         }
-        q.Push(std::make_unique<UrlJob>(newHref));
-        body = result.suffix().str();
     }
 
 }
