@@ -1,0 +1,117 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <stdlib.h>
+#include <iostream>
+#include <fstream>
+#include <thread>
+#include <mutex>
+#include <string>
+#include <atomic>
+#include <vector>
+using namespace std;
+
+struct read_arg {
+	mutex& m_in;
+	mutex& m_vector;
+	vector <string>& words;
+	ifstream& in;
+
+	read_arg(mutex& m_in0,
+		mutex& m_vector0,
+		vector <string>& words0,
+		ifstream& in0) 
+		: m_in(m_in0),
+		m_vector(m_vector0),
+		words(words0),
+		in(in0)
+	{}
+};
+
+void read(read_arg _) {
+	string S;
+	for (;;) {
+		_.m_in.lock();
+		if (_.in.eof()) {
+			_.m_in.unlock();
+			return;
+		}
+		_.in >> S;
+		_.m_in.unlock();
+		_.m_vector.lock();
+		_.words.push_back(S);
+		_.m_vector.unlock();
+	}
+
+}
+
+struct count_arg {
+	int start_pos, end_pos;
+	const string& S;
+	atomic_int& cnt;
+	const vector <string>& words;
+
+	int id;
+
+	count_arg(int start_pos0, int end_pos0, const string& S0, atomic_int& cnt0, const vector <string>& words0) 
+		: start_pos(start_pos0),
+		end_pos(end_pos0),
+		S(S0),
+		cnt(cnt0), 
+		words(words0)
+	{
+		static int c = 0;
+		id = ++c;
+	}
+};
+
+void count(count_arg _) {
+	for (int i = _.start_pos; i < _.end_pos; i++) {
+		static mutex m;
+		/*m.lock();
+		cout << _.id << " " << i << " " << _.words[i] << endl;
+		m.unlock();*/
+		if (_.words[i] == _.S) {
+			_.cnt++;
+		}
+	}
+}
+
+int main() {
+	std::ifstream in("input.txt");
+	std::ofstream cout("output.txt");
+	int T;
+	string S; 
+	vector <string> words;
+	mutex m_in, m_vector;
+	in >> T >> S;
+	vector <thread> t(T);
+	for (int i = 0; i < T; i++) {
+		read_arg _(m_in, m_vector, words, in);
+		t[i] = thread(read, _);
+	}
+	for (int i = 0; i < T; i++) {
+		t[i].join();
+	}
+
+	//for (auto w : words)
+		//cout << w << endl;
+
+	atomic_int cnt = 0;
+
+	int len = words.size();
+	for (int i = 0; i < T; i++) {
+		int start_pos = i * len / T;
+		int end_pos = (i + 1) * len / T;
+
+		//cout << start_pos << " " << end_pos << endl;
+
+		count_arg _(start_pos, end_pos, S, cnt, words);
+		t[i] = thread(count, _);
+	}
+	for (int i = 0; i < T; i++) {
+		t[i].join();
+	}
+	
+	cout << cnt;
+	return 0;
+}
