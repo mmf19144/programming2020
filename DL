@@ -1,0 +1,416 @@
+#include <cstring>
+#include <list>
+#include <sstream>
+#include <iostream>
+#include <unordered_map>
+#include <queue>
+#include <utility>
+#include <fstream>
+#include <stack>
+
+using namespace std;
+
+class Expression {
+public:
+    virtual Expression* eval(unordered_map <string, Expression*> env) = 0;
+    virtual ~Expression() = default;
+};
+
+stack<Expression*> leak_memory;
+
+
+Expression* find_exp(unordered_map <string, Expression*> env, string var) {
+    auto result = env.find(var);
+    if (result == env.end())
+        throw "Undefined variable error";
+    else
+        return result->second;
+}
+
+
+class Variable : public Expression {
+private:
+    string var;
+public:
+    Variable(string _v) : var(_v) {}
+    Expression* eval(unordered_map <string, Expression*> env) {
+        Expression* var_exp = find_exp(env, var);
+        return var_exp;
+    }
+};
+
+
+class Value : public Expression {
+private:
+    int val;
+public:
+    Value(int _v) : val(_v) {}
+    Expression* eval(unordered_map <string, Expression*> env) {
+        return this;
+    }
+    int get_val() {
+        return val;
+    }
+};
+
+
+class Add : public Expression {
+private:
+    Expression *left = nullptr, *right = nullptr;
+public:
+    Add(Expression* _r, Expression* _l) : left(_l), right(_r) {}
+    Expression* eval(unordered_map <string, Expression*> env) {
+        Value* left_sum = dynamic_cast<Value*>(left->eval(env));
+        Value* right_sum = dynamic_cast<Value*>(right->eval(env));
+        if (left_sum == nullptr || right_sum == nullptr)
+            throw "Type error";
+        else {
+            leak_memory.push(new Value(left_sum->get_val() + right_sum->get_val()));
+            return leak_memory.top();
+        }
+    }
+    ~Add() {
+        delete left;
+        delete right;
+    }
+};
+
+
+class If : public Expression {
+private:
+    Expression *left = nullptr, 
+        *right = nullptr, 
+        *then_exp = nullptr, 
+        *else_exp = nullptr;
+public:
+    If(Expression* _r, Expression* _l) : left(_l), right(_r) {}
+    void set_then(Expression* _t) { then_exp = _t; }
+    void set_else(Expression* _e) { else_exp = _e; }
+    Expression* eval(unordered_map <string, Expression*> env) {
+        Value* left_sum = dynamic_cast<Value*>(left->eval(env));
+        Value* right_sum = dynamic_cast<Value*>(right->eval(env));
+        if (left_sum == nullptr || right_sum == nullptr)
+            throw "Type error";
+        if (left_sum->get_val() > right_sum->get_val()) {
+            return then_exp->eval(env);
+        }
+        else {
+            return else_exp->eval(env);
+        }
+    }
+    ~If() {
+        delete left;
+        delete right;
+        delete then_exp;
+        delete else_exp;
+    }
+};
+
+
+class Function : public Expression {
+private:
+    string arg;
+    Expression* action;
+    unordered_map <string, Expression*> lexical_scope;
+    friend class Let;
+public:
+    Function(string _a, Expression* _ac) : arg(_a), action(_ac) {}
+    Expression* eval(unordered_map <string, Expression*> env) {
+        lexical_scope = env;
+        return this;
+    }
+    Expression* eval(Expression* arg_val) {
+        lexical_scope[arg] = arg_val;
+        return action->eval(lexical_scope);
+    }
+    ~Function() {
+        delete action;
+    }
+};
+
+
+class Let : public Expression {
+private:
+    string var;
+    Expression* value, * body;
+public:
+    Let(string _v) : var(_v) {}
+    void set_value(Expression* _value) { value = _value; }
+    void set_body(Expression* _body) { body = _body; }
+    Expression* eval(unordered_map <string, Expression*> env) {
+        env[var] = value->eval(env);
+        Function* fun = dynamic_cast<Function*>(env[var]);
+        if (fun != nullptr) {
+            fun->lexical_scope = env;
+        }
+        return body->eval(env);
+    }
+    ~Let() {
+        delete value;
+        delete body;
+    }
+};
+
+
+class Call : public Expression {
+private:
+    Expression* func, * arg;
+public:
+    Call(Expression* _a, Expression* _f) : func(_f), arg(_a) {}
+    Expression* eval(unordered_map <string, Expression*> env) {
+        Function* call_func = dynamic_cast<Function*>(func->eval(env));
+        if (call_func == nullptr) {
+            throw "Type error";
+        }
+        return call_func->eval(arg->eval(env));
+    }
+    void change_func(Expression *_f) {
+        func = _f;
+    }
+    ~Call() {
+        delete func;
+        delete arg;
+    }
+};
+
+
+class Array : public Expression {
+private:
+    vector<Expression*> arr;
+public:
+    Array() {}
+    void add(Expression* new_exp) {
+        arr.push_back(new_exp);
+    }
+    Expression* eval(unordered_map<string, Expression*> env){
+        Array* result = new Array;
+        for (auto iter : arr) {
+            result->arr.push_back(iter->eval(env));
+        }
+        return result;
+    }
+    Expression* get_elem(int index) const {
+        return arr[index];
+    }
+    int get_size() {
+        return arr.size();
+    }
+    void print(ofstream &fout) {
+        fout << "(arr";
+        for (auto iter : arr) {
+            fout << " (val ";
+            fout << (dynamic_cast<Value*>(iter))->get_val();
+            fout << ")";
+        }
+        fout << ")" << endl;
+    }
+    ~Array() {
+        for (auto iter : arr) {
+            delete iter;
+        }
+    }
+};
+
+
+class Gen : public Expression {
+private:
+    Expression* length = nullptr, * func = nullptr;
+public:
+    Gen(Expression* _f, Expression* _l) : length(_l), func(_f) {}
+
+    Expression* eval(unordered_map<string, Expression*> env) {
+        Value* val = dynamic_cast<Value*>(length->eval(env));
+        if (val == nullptr)
+            throw "Type error";
+        int len = val->get_val();
+        if (len < 0) {
+            throw "Bad argument error";
+        }
+        else {
+            Array* gen_arr = new Array;
+            for (int i = 0; i < len; i++) {
+                Value* curr_index = new Value(i);
+                Call* curr_call = new Call(curr_index, func);
+                gen_arr->add(curr_call->eval(env));
+                curr_call->change_func(nullptr);
+                leak_memory.push(curr_call);
+            }
+            return gen_arr;
+        }
+    }
+    ~Gen() {
+        delete length;
+        delete func;
+    }
+};
+
+
+class At : public Expression {
+private:
+    Expression* arr = nullptr, * index = nullptr;
+public:
+
+    At(Expression* _ind, Expression* _a) : arr(_a), index(_ind) {}
+
+    Expression* eval(unordered_map<string, Expression*> env) {
+        Array* ptr = dynamic_cast<Array*>(arr->eval(env));
+        if (ptr == nullptr) {
+            throw "Type error";
+        }
+        int index_val = dynamic_cast<Value*>(index->eval(env))->get_val();
+
+        if (index_val < 0 || index_val >= ptr->get_size())
+            throw "Index out of range error";
+
+        return ptr->get_elem(index_val);
+    }
+    ~At() {
+        delete arr;
+        delete index;
+    }
+};
+
+
+
+queue <string> parsed_commands;
+
+
+Expression* get_expression() {
+    Expression* result = nullptr;
+
+    while (!parsed_commands.empty()) {
+        string curr_command = parsed_commands.front();
+        parsed_commands.pop();
+
+        if (curr_command == "(")
+        {
+            return get_expression();
+        }
+        else if (curr_command == ")")
+        {
+            return result;
+        }
+        else if (curr_command == "val")
+        {
+            result = new Value(stoi(parsed_commands.front()));
+            parsed_commands.pop();
+        }
+        else if (curr_command == "var")
+        {
+            result = new Variable(parsed_commands.front());
+            parsed_commands.pop();
+        }
+        else if (curr_command == "add")
+        {
+            result = new Add(get_expression(), get_expression());
+        }
+        else if (curr_command == "if")
+        {
+            If* exp = new If(get_expression(), get_expression());
+            if (parsed_commands.front() != "then")
+                throw "Syntax error";
+            parsed_commands.pop();
+            exp->set_then(get_expression());
+            if (parsed_commands.front() != "else")
+                throw "Syntax error";
+            parsed_commands.pop();
+            exp->set_else(get_expression());
+            result = exp;
+        }
+        else if (curr_command == "let")
+        {
+            Let* exp = new Let(parsed_commands.front());
+            parsed_commands.pop();
+            if (parsed_commands.front() != "=")
+                throw "Syntax error";
+            parsed_commands.pop();
+            exp->set_value(get_expression());
+            if (parsed_commands.front() != "in")
+                throw "Syntax error";
+            parsed_commands.pop();
+            exp->set_body(get_expression());
+            result = exp;
+        }
+        else if (curr_command == "function")
+        {
+            string curr_id = parsed_commands.front();
+            parsed_commands.pop();
+            result = new Function(curr_id, get_expression());
+        }
+        else if (curr_command == "call")
+        {
+            result = new Call(get_expression(), get_expression());
+        }
+        else if (curr_command == "arr")
+        {
+            Array* arr = new Array;
+            while (parsed_commands.front() != ")") {
+                arr->add(get_expression());
+            }
+            result = arr;
+        }
+        else if (curr_command == "gen")
+        {
+            result = new Gen(get_expression(), get_expression());
+        }
+        else if (curr_command == "at")
+        {
+            result = new At(get_expression(), get_expression());
+        }
+    }
+}
+
+
+int main()
+{
+    ifstream fin("input.txt");
+    ofstream fout("output.txt");
+ 
+    try {
+        string str_for_reading, temp_str;
+
+        while (fin >> temp_str) {
+            str_for_reading = str_for_reading + temp_str + " ";
+        }
+
+        for (int i = 0; i < str_for_reading.length(); i++) {
+            if (str_for_reading[i] == '(') {
+                str_for_reading.insert(i + 1, " ");
+            }
+            else if (str_for_reading[i] == ')') {
+                str_for_reading.insert(i, " ");
+                i++;
+            }
+        }
+
+        stringstream good_input(str_for_reading);
+
+        while (good_input >> temp_str) {
+            parsed_commands.push(temp_str);
+        }
+
+        Expression* programm = get_expression();
+        
+        unordered_map<string, Expression*> env;
+        Expression* result = programm->eval(env);
+
+        if (dynamic_cast<Value*>(result) != nullptr) {
+            fout << "(val " << (dynamic_cast<Value*>(result))->get_val() << ")" << endl;
+        }
+        else if (dynamic_cast<Array*>(result) != nullptr) {
+            (dynamic_cast<Array*>(result))->print(fout);
+        }
+
+        while (!leak_memory.empty()) {
+            Expression* top = leak_memory.top();
+            delete top;
+            leak_memory.pop();
+        }
+
+        delete programm;
+    }
+    catch (...) {
+        fout << "ERROR" << endl;
+    }
+    return 0;
+}
