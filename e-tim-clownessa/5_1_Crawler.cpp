@@ -22,7 +22,7 @@ queue<string> order;
 mutex morder, mmarks;
 set<string> marks;
 
-string setNice(string fn) { //sets to 42.html
+string setNice(string fn) { 
 	fn.erase(fn.begin(), fn.begin() + 7);
 	return fn;
 }
