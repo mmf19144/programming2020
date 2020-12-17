@@ -31,7 +31,10 @@ public:
         for (int i = 0; i < num; i++) {
             for (int j = 0; j < num; j++) {
                 if (singular) {
-                    if (i == j) { this->data[i * num + i] = 1; }
+                    if (i == j) {
+                        this->data[i * num + i] = 1;
+                        continue;
+                    }
                 }
                 this->data[i * num + j] = 0;
             }
