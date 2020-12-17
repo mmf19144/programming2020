@@ -9,7 +9,7 @@
 #include <cassert>
 
 
-
+//#define DEBUG
 //#define ADDITIONAL_TASK
 #ifdef ADDITIONAL_TASK
 #include "Matrix.cpp"
@@ -78,7 +78,6 @@ public:
     class Iterator : public std::iterator<std::input_iterator_tag, T> {
     private:
         friend class List<T>;
-
         Node *current;
     public:
         Iterator() : current(nullptr) {}
@@ -162,6 +161,7 @@ private:
     float rehash_value;
     size_t size;
     size_t capacity = 0;
+    size_t key_capacity = 0;
 
     void rehash() {
         hash_map<Key, Value> new_table(size * 2, rehash_value);
@@ -170,6 +170,7 @@ private:
         }
         std::swap(data, new_table.data);
         capacity = new_table.capacity;
+        key_capacity = new_table.key_capacity;
         size = new_table.size;
     }
 
@@ -191,14 +192,20 @@ public:
     void insert(Key k, Value v) {
         size_t key_hash = hash(k);
         std::pair<Key, Value> a(k, v);
+
+#ifdef DEBUG
+        std::cout << k << " " << key_hash << " "<< data[key_hash].isExist(k) << std::endl;
+#endif
+
         if (data[key_hash].isExist(k)) {
             data[key_hash][a].second = v;
         } else {
             capacity++;
+            key_capacity++;
             data[key_hash].pushFront(a);
         }
 
-        if ((float) capacity / size >= rehash_value)
+        if ((float) key_capacity / size >= rehash_value)
             rehash();
     }
 
@@ -209,8 +216,9 @@ public:
         if (data[key_hash].isExist(k)) {
             std::pair<Key, Value> p(k, operator[](k));
             data[key_hash].popByValue(p);
+            capacity--;
             if (data[key_hash].isEmpty())
-                capacity--;
+                key_capacity--;
         }
     }
 
@@ -354,6 +362,19 @@ void run(std::istream &input, std::ostream &output) {
     output << hash_map.getCapacity() << " " << getCntUniqValues<Key, Value>(&hash_map);
 }
 
+//class my_string : public std::string {
+//};
+//
+//namespace std {
+//    template<>
+//    class hash<my_string> {
+//    public:
+//        size_t operator()(const my_string &) const {
+//            return 0xdeadbeef;
+//        }
+//    };
+//}
+
 int main() {
     char key_type, val_type;
     std::ifstream input("input.txt");
@@ -373,6 +394,7 @@ int main() {
         run<std::string, int>(input, output);
     } else if (key_type == 'S' && val_type == 'D') {
         run<std::string, double>(input, output);
+//        run<my_string, double>(input, output);
     } else if (key_type == 'I' && val_type == 'I') {
         run<int, int>(input, output);
     } else if (key_type == 'D' && val_type == 'D') {
