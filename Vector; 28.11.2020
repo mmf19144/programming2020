@@ -1,0 +1,168 @@
+#include <fstream>
+#include <string>
+#include <typeinfo>
+#include <cmath>
+
+
+template<typename T>
+class Vector {
+private:
+	T* data;
+	size_t size;//размер
+	size_t cap;//коол-во элементов внутри
+public:
+	Vector() : size(10), cap(0), data(new T[10]) {}
+	Vector(size_t size) : size(size), cap(0), data(new T[size]) {}
+
+	Vector(const Vector& v): size(v.size), cap(v.cap), data(new T[v.size]) {
+		for (size_t i = 0; i < cap; i++)
+			data[i] = v.data[i];
+	}
+
+	Vector& operator =(const Vector& v) {
+		delete[] data;
+		size = v.size;
+		cap = v.cap;
+		data = new T[size];
+		for (size_t i = 0; i < cap; i++)
+			data[i] = v.data[i];
+
+		return *this;
+	}
+
+	~Vector() {
+		delete[] data;
+	}
+
+	void push(T elem) {
+		if (cap < size) {
+			data[cap] = elem;
+			cap++;
+			return;
+		}
+		Vector u(size * 2);
+		for (size_t i = 0; i < size; i++)
+			u.data[i] = data[i];
+		u.data[size] = elem;
+		u.cap = size + 1;
+		*this = u;
+	}
+
+	void pop(size_t idx) {
+		if (idx >= cap)
+			throw "удаление по некорректному индексу";
+
+		for (size_t i = idx; i < cap - 1; i++)
+			data[i] = data[i + 1];
+		cap--;
+	}
+
+	T& operator [](size_t idx) {
+		if (idx >= cap)
+			throw "попытка взятия элемента по некорректному индексу";
+
+		return data[idx];
+	}
+
+	void shift_right(size_t num) {
+		Vector u(size);
+		for (size_t i = 0; i < cap; i++)
+			u.data[(i + num) % cap] = data[i];//здесь используется свойство цикличности кольца вычетов по модулю cap
+		u.cap = cap;
+		*this = u;
+	}
+
+	void shift_left(size_t num) {//к сожалению, в с++ остатки почему-то бывают отрицательными, поэтому для сдвига 
+		Vector u(size);////////////влево реализация немного другая
+		for (size_t i = 0; i < cap; i++) {
+			int a = i - num;
+			if (a >= 0)
+				u.data[a] = data[i];
+			else
+				u.data[cap + a] = data[i];
+		}
+		u.cap = cap;
+		*this = u;
+	}
+
+	void Print(std::ostream& out) {
+		if(cap == 0)
+			throw "попытка печати пустого массива";
+		
+		for (size_t i = 0; i < cap; i++)
+			out << data[i] << std::endl;
+	}
+};
+
+template<> void Vector<double>::Print(std::ostream& out) {
+	for (size_t i = 0; i < cap; i++)
+		out << round((data[i]) * 100) / 100 << std::endl;
+}
+
+template<typename T>
+void run(std::istream& in, std::ostream& out) {
+	Vector<T> u(25);
+	size_t n;
+	in >> n;
+	std::string com;
+	T elem;
+	size_t idx;
+
+	try
+	{
+		for (size_t i = 0; i < n; i++) {
+			in >> com;
+			if (com == "ADD") {
+				in >> elem;
+				u.push(elem);
+			}
+			if (com == "REMOVE") {
+				in >> idx;
+				u.pop(idx);
+			}
+			if (com == "PRINT") {
+				in >> idx;
+				Vector<T> v(1);//чтобы не вводить ещё одну специализацию
+				v.push(u[idx]);
+				v.Print(out);
+			}
+			if (com == "UPDATE") {
+				in >> idx >> elem;
+				u[idx] = elem;
+			}
+			if (com == "LSH") {
+				in >> idx;
+				u.shift_left(idx);
+			}
+			if (com == "RSH") {
+				in >> idx;
+				u.shift_right(idx);
+			}
+		}
+		u.Print(out);
+	}
+	catch (const char* ex)
+	{
+		//out << "Ошибка: " << ex << std::endl;
+		out << "ERROR" << std::endl;
+	}
+}
+
+
+int main()
+{
+	std::ifstream fin{ "input.txt" };
+	std::ofstream fout{ "output.txt" };
+
+	char id;
+	fin >> id;
+	if (id == 'I')
+		run<int>(fin, fout);
+	if (id == 'D')
+		run<double>(fin, fout);
+	if (id == 'S')
+		run<std::string>(fin, fout);
+
+
+	return 0;
+}
