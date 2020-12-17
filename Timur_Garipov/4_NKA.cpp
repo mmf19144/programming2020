@@ -170,7 +170,7 @@ private:
             type currentCond = way[way.size() - 1];
             Key c(currentCond, symb);
 
-            if (map_[c] == NULL) {
+            if(map_.count(c) == 0){
                 way[0] = 1;
             }
 
