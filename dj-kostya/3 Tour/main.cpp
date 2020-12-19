@@ -86,11 +86,11 @@ public:
         friend class List<T>;
 
         Node *current;
-        Node *prev;
-    public:
-        Iterator() : current(nullptr), prev(nullptr) {}
 
-        explicit Iterator(List<T> &l) : current(l.head.get()), prev(nullptr) {}
+    public:
+        Iterator() : current(nullptr) {}
+
+        explicit Iterator(List<T> &l) : current(l.head.get()) {}
 
         Iterator(List<T>::Iterator const &other) : current(other.current) {}
 
@@ -107,7 +107,7 @@ public:
         }
 
         Iterator operator--() {
-            if (current && prev)
+            if (current)
                 current--;
             return *this;
         }
@@ -615,4 +615,3 @@ int main() {
     return 0;
 
 }
-
