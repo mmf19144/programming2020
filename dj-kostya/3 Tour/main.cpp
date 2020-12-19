@@ -163,7 +163,7 @@ public:
 };
 
 
-#ifdef MATRIX_AVAILABLE
+#ifdef MULTIMAP_AVAILABLE
 
 template<typename T>
 class MultiList : public List<T> {
@@ -430,7 +430,7 @@ size_t getCntUniqValues(hash_map<Key, Value> *hm) {
     return a.getCapacity();
 }
 
-#ifdef MATRIX_AVAILABLE
+#ifdef MULTIMAP_AVAILABLE
 
 template<typename Key, typename Value>
 class MultiMap : public hash_map<Key, Value> {
