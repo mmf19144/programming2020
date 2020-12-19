@@ -10,10 +10,6 @@ class Matrix {
     int dim;
 
 public:
-    //friend std::istream& operator>>(std::istream& in, Matrix& m);
-    //friend std::ostream& operator<<(std::ostream& out, Matrix& m);
-
-
 
     Matrix():
             dim(0), data(nullptr){
@@ -39,7 +35,7 @@ public:
                 this->data[i * num + j] = 0;
             }
         }
-        //for (int i = 0; i < num; i++) { this->data[i][i] = 1; }
+
     }
 
     Matrix(int num, int const *arr) {
