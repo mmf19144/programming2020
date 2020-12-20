@@ -50,15 +50,16 @@ public:
 				}
 				//если можем много куда перейти, то создаём путь для каждого варианта
 				size_t n = tab[c].size() - 1;//-1, т.к. одна строчка уже есть(исходная)
-				for (size_t j = 0; j < n; j++)
-					ways.push_back(*i);
+				auto p = ways.begin();//просто инициализация вспомогательного указателя
+				for (size_t j = 0; j < n; j++) {
+					p = ways.emplace(i, *i);
+				}//на выходе р будет указывать на последний из добавленных вариантов путей
+				//а i будет последним из них всех
 
 				(*i).push_back(tab[c][0]);
-				advance(i, n);//чтобы не зацикливаться
-				auto j = ways.end();
-				j--;
-				for (; n != 0; j--) {
-					(*j).push_back(tab[c][n]);
+				
+				for (; n != 0; p--) {
+  					(*p).push_back(tab[c][n]);
 					n--;
 				}
 				i++;
@@ -73,17 +74,15 @@ public:
 		ways.push_back(sup);
 		
 		check(str);
-		
+		asw = "NO";
 		for (auto i = ways.begin(); i != ways.end(); i++) {//перебераем все пути и ищем конечные состояния
 			for (size_t j = 0; j < finish.size(); j++)
 				if ((*i)[(*i).size() - 1] == finish[j]) {
 					asw = "YES";
-					goto here;
+					break;
 				}
 		}
-		asw = "NO";
-	here:
-		
+
 		for (auto i = ways.begin(); i != ways.end(); i++)
 			(*i).clear();
 		ways.clear();
@@ -129,3 +128,4 @@ int main()
 	fin.close();
 	return 0;
 }
+
