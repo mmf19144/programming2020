@@ -82,9 +82,6 @@ public:
 					break;
 				}
 		}
-
-		for (auto i = ways.begin(); i != ways.end(); i++)
-			(*i).clear();
 		ways.clear();
 		
 		return asw;
