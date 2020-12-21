@@ -11,7 +11,7 @@ using namespace std;
 
 class Crawler
 {
-	const regex regexp_link{ R"(<a href="[^>]+">)" };
+	const regex reg_modify{ "<a href=\"([^\"]*)\">" };
 	const size_t max_threads;
 
 	unordered_map<string, string> current_files;
@@ -30,25 +30,16 @@ class Crawler
 		return { first, second };
 	}
 
-	vector<string> get_links(string& data)
+	vector<string> get_links(string & data)
 	{
 		vector<string> pairs;
 		smatch m;
-
-		while (regex_search(data, m, regexp_link))
+		for (auto i = sregex_iterator(data.begin(), data.end(), reg_modify); i != std::sregex_iterator(); i++)
 		{
-			string temp = m.str();
-
-			regex re{ R"(".*")" };
-			smatch m1;
-
-			regex_search(temp, m1, re);
-
-			string temp1 = m1.str();
-			auto pair_path = temp1.substr(1, temp1.length() - 2);
-			pairs.push_back(pair_path);
-			data = m.suffix();
+			std::smatch m = *i;
+			pairs.push_back(m[1].str());
 		}
+		
 		return pairs;
 	}
 
@@ -75,29 +66,35 @@ class Crawler
 			getline(fin, data, (char)fin.eof());
 
 			auto links = get_links(data);
-			mut.lock();
-			for (const auto& l : links)
+			for (const auto & l : links)
 			{
+				mut.lock();
 				if (viewed_files.find(l) == viewed_files.end())
 				{
 					current_files.insert({ l, l });
 				}
+				mut.unlock();
 			}
-			mut.unlock();
 		}
+		mut.lock();
 		work_threads--;
+		mut.unlock();
 	}
 
 	void start_parse()
 	{
+		mut.lock();
 		while (!current_files.empty() || work_threads != 0)
 		{
+			mut.unlock();
 			parsing();
+			mut.lock();
 		}
+		mut.unlock();
 	}
 
 public:
-	Crawler(const size_t max_threads = 6) : max_threads{ max_threads }
+	Crawler(const size_t max_threads = 8) : max_threads{ max_threads }
 	{	}
 
 	void run(string address)
@@ -126,11 +123,12 @@ public:
 
 int main()
 {
-	string address;
+	string address = "file://0.html";
 	cin >> address;
 
-	Crawler crawler;
+	Crawler crawler{8};
 	crawler.run(address);
 	auto [time2, count2] = crawler.get_statistics();
 	cout << "Crawler 6 threads. Time - " << time2.count() << "ms, count pages - " << count2 << endl;
+	
 }
