@@ -154,11 +154,11 @@ public:
             return table[iter].getValue();
         } else {
             iter++;
-            while (table[iter].getFilled() && table[iter].getKey() != getKey && iter != hash_value) {
+            while ((table[iter].getFilled() || table[iter].getDeleted()) && table[iter].getKey() != getKey) {
                 iter++;
                 iter %= size;
             }
-            if (!table[iter].getDeleted)
+            if (!table[iter].getDeleted() && table[iter].getFilled())
                 return table[iter].getValue();
             else
                 return nullptr;
@@ -209,6 +209,7 @@ public:
             if (table[iter].getFilled() && table[iter].getKey() == delKey) {
                 table[iter].delete_element();
                 capacity--;
+                return;
             }
             iter++;
             iter %= size;
