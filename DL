@@ -1,0 +1,955 @@
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <list>
+#include <unordered_map>
+#include <vector>
+#include <algorithm>
+#include <stack>
+#include <exception>
+
+using namespace std;
+
+class MyException : public exception {
+    string s;
+
+public:
+    explicit MyException(string ss) : s(move(ss)) {}
+    ~MyException() noexcept override = default;
+
+    const char* what() const noexcept override {
+        return s.c_str();
+    }
+};
+
+//Token
+class Token {
+public:
+    Token() {}
+    virtual ~Token() = default;
+};
+
+class TokenWithOpenBracket: public Token {};
+class TokenWithCloseBracket: public Token {};
+class TokenAssignOperator: public Token {};
+class TokenKeyword: public Token {
+
+public:
+    TokenKeyword(const TokenKeyword& keyword) : keyword(keyword.keyword) {}
+    TokenKeyword(string str) : keyword(str) {}
+
+    string& GetKeyword() {
+        return keyword;
+    }
+
+private:
+    string keyword;
+};
+
+class IdentifierToken : public Token {
+public:
+    IdentifierToken(const IdentifierToken& id) : id(id.id) {}
+    IdentifierToken(string id) : id(id) {}
+
+    string& GetingId() {
+        return id;
+    }
+
+private:
+    string id;
+};
+
+class ValueToken : public Token {
+public:
+    ValueToken(const ValueToken& val) : value(val.value) {}
+    ValueToken(int value) : value(value) {}
+
+    int GetValue() {
+        return value;
+    }
+
+private:
+    int value;
+};
+
+//tokenize
+
+const char BRACKET_OPEN = '(';
+const char BRACKET_CLOSE = ')';
+const char ASSIGN_OPERATOR = '=';
+const char MINUS = '-';
+
+enum class TokenizerState {
+    TokenWait,
+    IntRead,
+    ReadWord
+};
+
+class Tokenizer {
+public:
+    Tokenizer(vector<string>& keywords, istream& in) : in(in), keywords(keywords), state(TokenizerState::TokenWait) {};
+
+    list<Token*> Tokenize() {
+        while (!in.eof() && in.peek() >= 0) {
+            switch (state) {
+            case TokenizerState::TokenWait:
+                WaitForToken();
+                break;
+            case TokenizerState::IntRead:
+                ReadIntState();
+                break;
+            case TokenizerState::ReadWord:
+                ReadWordState();
+            }
+        }
+
+        if (state == TokenizerState::IntRead && buff.length())
+            tokens.push_back((Token*)TokenCreateValue());
+
+        if (state == TokenizerState::ReadWord && buff.length())
+            tokens.push_back(TokenCreateWord());
+
+        return tokens;
+    }
+protected:
+    void ReadIntState() {
+        int ch = in.get();
+        if (ch < 0) return;
+
+        if (isdigit(ch)) {
+            buff += ch;
+            return;
+        }
+
+        Token* token = TokenCreateValue();
+        tokens.push_back(token);
+        in.putback(ch);
+        state = TokenizerState::TokenWait;
+    }
+
+    void ReadWordState() {
+        int ch = in.get();
+        if (ch < 0) return;
+
+        if (isalnum(ch)) {
+            buff += ch;
+            return;
+        }
+
+        Token* token = TokenCreateWord();
+        tokens.push_back(token);
+        in.putback(ch);
+        state = TokenizerState::TokenWait;
+    }
+
+    void WaitForToken() {
+        int ch = in.get();
+        if (ch < 0) return;
+
+        if (isspace(ch) || isblank(ch)) return;
+
+        if (isalnum(ch) || ch == MINUS) {
+            buff += ch;
+            state = isalpha(ch)
+                ? TokenizerState::ReadWord
+                : TokenizerState::IntRead;
+            return;
+        }
+
+        if (ch == BRACKET_OPEN) {
+            tokens.push_back((Token*)(new TokenWithOpenBracket()));
+            return;
+        }
+
+        if (ch == BRACKET_CLOSE) {
+            tokens.push_back((Token*)(new TokenWithCloseBracket()));
+            return;
+        }
+
+        if (ch == ASSIGN_OPERATOR) {
+            tokens.push_back((Token*)(new TokenAssignOperator()));
+            return;
+        }
+
+        throw MyException("Character is unknown: " + to_string(ch));
+
+    }
+
+    ValueToken* TokenCreateValue() {
+        ValueToken* token = new ValueToken(stoi(buff));
+        buff = "";
+        return token;
+    }
+    Token* TokenCreateWord() {
+        bool isKeyword = find(keywords.begin(), keywords.end(), buff) != keywords.end();
+        Token* token = isKeyword
+            ? (Token*) new TokenKeyword(buff)
+            : (Token*) new IdentifierToken(buff);
+        buff = "";
+        return token;
+    }
+private:
+    vector<string>& keywords;
+    istream& in;
+    list<Token*> tokens;
+    TokenizerState state;
+    string buff;
+};
+
+//Abstract Syntax Tree
+
+class Expression {
+public:
+    Expression() {}
+    virtual ~Expression() = default;
+    virtual Expression* Clone() {
+        return new Expression();
+    }
+    virtual string ToString() {
+        return "(expr)";
+    }
+};
+
+class Valexpression : public Expression {
+public:
+    Valexpression(int val) : value(val) {};
+    int GetValue() const {
+        return value;
+    }
+    virtual Expression* Clone() {
+        return (Expression*) new Valexpression(value);
+    }
+    virtual string ToString() {
+        return "(val " + to_string(value) + ")";
+    }
+private:
+    int value;
+};
+
+class VarExpression : public Expression { //Var
+public:
+    VarExpression(string& str) : id(str) {};
+    string GetId() const {
+        return id;
+    }
+
+    Expression* Clone() override {
+        return (Expression*) new VarExpression(id);
+    }
+
+    string ToString() override {
+        return "(var " + id + ")";
+    }
+
+private:
+    string id;
+};
+
+class AddExpression : public Expression { //add
+public:
+    AddExpression(Expression* left, Expression* right) : l(left), r(right) {};
+
+    ~AddExpression() {
+        delete l; delete r;
+    }
+
+    Expression* GetLeftOperand() const {
+        return l;
+    }
+
+    Expression* GetRightOperand() const {
+        return r;
+    }
+
+    virtual Expression* Clone() {
+        return (Expression*) new AddExpression(l->Clone(), r->Clone());
+    }
+
+    virtual string ToString() {
+        return "(add " + l->ToString() + " " + r->ToString() + ")";
+    }
+private:
+    Expression* l;
+    Expression* r;
+};
+
+class IfExpression : public Expression { //if
+public:
+    IfExpression(Expression* left, Expression* right, Expression* thenBranch, Expression* elseBranch) :
+        l(left), r(right), Branchthen(thenBranch), Branchelse(elseBranch) {};
+
+    ~IfExpression() {
+        delete l;
+        delete r;
+        delete Branchthen;
+        delete Branchelse;
+    }
+
+    Expression* GetLeftOperand() const {
+        return l;
+    }
+
+    Expression* GetRightOperand() const {
+        return r;
+    }
+
+    Expression* GetThenBranch() const {
+        return Branchthen;
+    }
+
+    Expression* GetElseBranch() const {
+        return Branchelse;
+    }
+
+    Expression* Clone() override {
+        return (Expression*)new IfExpression(
+            l->Clone(),
+            r->Clone(),
+            Branchthen->Clone(),
+            Branchelse->Clone()
+        );
+    }
+
+    string ToString() override {
+        return "(if " + l->ToString() + " " + r->ToString() + " then " + Branchthen->ToString() + " else " + Branchelse->ToString() + ")";
+    }
+
+private:
+    Expression* l;
+    Expression* r;
+    Expression* Branchthen;
+    Expression* Branchelse;
+};
+/*
+class IfExpression : public Expression { //if
+public:
+    IfExpression(Expression* left, Expression* right, Expression* thenBranch, Expression* elseBranch) :
+        l(left), r(right), Branchthen(thenBranch), Branchelse(elseBranch) {};
+
+    ~IfExpression() {
+        delete l;
+        delete r;
+        delete Branchthen;
+        delete Branchelse;
+    }
+
+    Expression* GetLeftOperand() const {
+        return l;
+    }
+
+    Expression* GetRightOperand() const {
+        return r;
+    }
+
+    Expression* GetThenBranch() const {
+        return Branchthen;
+    }
+
+    Expression* GetElseBranch() const {
+        return Branchelse;
+    }
+
+    Expression* Clone() override {
+        return (Expression*)new IfExpression(
+            l->Clone(),
+            r->Clone(),
+            Branchthen->Clone(),
+            Branchelse->Clone()
+        );
+    }
+
+    string ToString() override {
+        return "(if " + l->ToString() + " " + r->ToString() + " then " + Branchthen->ToString() + " else " + Branchelse->ToString() + ")";
+    }
+
+private:
+    Expression* l;
+    Expression* r;
+    Expression* Branchthen;
+    Expression* Branchelse;
+};*/
+
+class LetExpression : public Expression { //let
+public:
+    LetExpression(const string& id, Expression* expression, Expression* body) :
+        id(id), expression(expression), body(body) {};
+    ~LetExpression() {
+        delete expression;
+        delete body;
+    }
+
+    string GetingId() const {
+        return id;
+    }
+
+    Expression* GetingExpression() const {
+        return expression;
+    }
+
+    Expression* GetingBody() const {
+        return body;
+    }
+
+    Expression* Clone() override {
+        return (Expression*)new LetExpression(id, expression->Clone(), body->Clone());
+    }
+
+    string ToString() override {
+        return "(let " + id + " = " + expression->ToString() + " in " + body->ToString() + ")";
+    }
+
+private:
+    string id;
+    Expression* expression;
+    Expression* body;
+};
+
+
+class BlockExpression : public Expression { //block
+public:
+    void AddExpression(Expression* expression) {
+        expressions.push_back(expression);
+    }
+
+    ~BlockExpression() {
+        auto it = expressions.begin();
+        while (it != expressions.end()) {
+            delete* it;
+            it++;
+        }
+    }
+
+    list<Expression*> GetExpressions() const {
+        return expressions;
+    }
+
+    Expression* Clone() override {
+        auto block = new BlockExpression();
+        for (auto p : expressions) {
+            block->AddExpression(p->Clone());
+        }
+        return (Expression*)block;
+    }
+
+    string ToString() override {
+        string blockValues;
+        for (auto expr : expressions) {
+            blockValues += expr->ToString() + " ";
+        }
+        return "(block " + blockValues + ")";
+    }
+
+private:
+    list<Expression*> expressions;
+};
+
+class FunctionExpression : public Expression { //func
+public:
+    FunctionExpression(const string& id, Expression* body) : id(id), body(body) {};
+
+    ~FunctionExpression() {
+        delete body;
+    }
+
+    string GetingId() const {
+        return id;
+    }
+
+    Expression* GetingBody() const {
+        return body;
+    }
+
+    Expression* Clone() override {
+        return (Expression*) new FunctionExpression(id, body->Clone());
+    }
+
+    string ToString() override {
+        return "(function " + id + " " + body->ToString() + ")";
+    }
+
+private:
+    string id;
+    Expression* body;
+};
+
+class CallExpression : public Expression { //call
+public:
+    CallExpression(Expression* callable, Expression* argument) : call(callable), arg(argument) {};
+
+    ~CallExpression() {
+        delete call; delete arg;
+    }
+
+    Expression* GetingCall() const {
+        return call;
+    }
+
+    Expression* GetingArg() const {
+        return arg;
+    }
+
+    Expression* Clone() override {
+        return (Expression*) new CallExpression(call->Clone(), arg->Clone());
+    }
+
+    string ToString() override {
+        return "(call " + call->ToString() + " " + arg->ToString() + ")";
+    }
+
+private:
+    Expression* call;
+    Expression* arg;
+};
+
+class SetExpression : public Expression { //set
+public:
+
+    SetExpression(const string& id, Expression* expression) :
+        id(id), expression(expression) {};
+    ~SetExpression() {
+        delete expression;
+    }
+
+    string GetingId() const {
+        return id;
+    }
+
+    Expression* GetExpression() const {
+        return expression;
+    }
+
+    Expression* Clone() override {
+        return (Expression*) new SetExpression(id, expression->Clone());
+    }
+
+    string ToString() override {
+        return "(set " + id + " " + expression->ToString() + ")";
+    }
+
+private:
+    string id;
+    Expression* expression;
+};
+
+
+
+class Parser {
+public:
+    Parser(list<Token*>& tokens) {
+        it = tokens.begin();
+        end = tokens.end();
+    }
+
+    Expression* Parse() {
+        return ParseExpression();
+    }
+
+    //Recursive parser
+    Expression* ParseExpression() {
+        static_cast<void>(GetingToken<TokenWithOpenBracket>());
+        auto keyword = GetingToken<TokenKeyword>();
+        Expression* expression = nullptr;
+
+        const string& str = keyword->GetKeyword();
+// all cases
+        if (str == "block")
+            expression = (Expression*)ParseBlockExpression();
+        else if (str == "val")
+            expression = (Expression*)ParseValExpression();
+        else if (str == "let")
+            expression = (Expression*)ParseLetExpression();
+        else if (str == "var")
+            expression = (Expression*)ParseVarExpression();
+        else if (str == "add")
+            expression = (Expression*)ParseAddExpression();
+        else if (str == "if")
+            expression = (Expression*)ParseIfxpression();
+        else if (str == "function")
+            expression = (Expression*)ParseFunctionExpression();
+        else if (str == "call")
+            expression = (Expression*)ParseCallExpression();
+        else if (str == "set")
+            expression = (Expression*)ParseSetExpression();
+
+        static_cast<void>(GetingToken<TokenWithCloseBracket>());
+        return expression;
+    }
+
+protected:
+    template<class T>
+    T* GetingToken() {
+        auto token = NextToken();
+        T* t = dynamic_cast<T*>(token);
+        if (t) return t;
+        throw MyException("Unexpected token");
+    }
+
+    TokenKeyword* GetKeyword(const string& str) {
+        auto token = GetingToken<TokenKeyword>();
+
+        if (token->GetKeyword() != str) throw MyException("keyword is unexpected");
+        return token;
+    }
+
+    Token* NextToken() {
+        if (it != end) {
+            auto token = *it;
+            it++;
+            return token;
+        }
+        throw MyException("end of file maybe unexpected");
+    }
+
+    /*
+        Token* NextToken() {
+        if (it != end) {
+            auto token = *it;
+            it++;
+            return token;
+        }
+        throw MyException("end of file maybe unexpected");
+    }*/
+
+    Valexpression* ParseValExpression() {
+        auto valueToken = GetingToken<ValueToken>();
+        int value = valueToken->GetValue();
+        return new Valexpression(value);
+    }
+
+    BlockExpression* ParseBlockExpression() {
+        BlockExpression* expr = new BlockExpression();
+        do {
+            auto token = NextToken();
+            auto closeBracket = dynamic_cast<TokenWithCloseBracket*>(token);
+            it--;
+            if (closeBracket) {
+                break;
+            }
+            else {
+                Expression* nestedExpression = ParseExpression();
+                expr->AddExpression(nestedExpression);
+            }
+
+        } while (true);
+
+        if (expr->GetExpressions().size() == 0) {
+            delete expr;
+            throw MyException("Block epxression must have expression that nested");
+        }
+        return expr;
+    }
+
+    LetExpression* ParseLetExpression() {
+        auto id = GetingToken<IdentifierToken>();
+        static_cast<void>(GetingToken<TokenAssignOperator>());
+
+        auto expression = ParseExpression();
+        static_cast<void>(GetKeyword("in"));
+        auto body = ParseExpression();
+        return new LetExpression(id->GetingId(), expression, body);
+    }
+
+    VarExpression* ParseVarExpression() {
+        auto token = GetingToken<IdentifierToken>();
+        return new VarExpression(token->GetingId());
+    }
+
+    AddExpression* ParseAddExpression() {
+        auto l = ParseExpression();
+        auto r = ParseExpression();
+        return new AddExpression(l, r);
+    }
+
+    IfExpression* ParseIfxpression() {
+        auto l = ParseExpression();
+        auto r = ParseExpression();
+        static_cast<void>(GetKeyword("then"));
+        auto trueBranch = ParseExpression();
+        static_cast<void>(GetKeyword("else"));
+        auto elseBranch = ParseExpression();
+        return new IfExpression(l, r, trueBranch, elseBranch);
+    }
+
+    FunctionExpression* ParseFunctionExpression() {
+        auto id = GetingToken<IdentifierToken>();
+        auto body = ParseExpression();
+        return new FunctionExpression(id->GetingId(), body);
+    }
+
+    CallExpression* ParseCallExpression() {
+        auto function = ParseExpression();
+        auto argument = ParseExpression();
+        return new CallExpression(function, argument);
+    }
+
+    SetExpression* ParseSetExpression() {
+        auto id = GetingToken<IdentifierToken>();
+        auto val = ParseExpression();
+        return new SetExpression(id->GetingId(), val);
+    }
+
+private:
+    list<Token*> tokens;
+    list<Token*>::iterator it;
+    list<Token*>::iterator end;
+};
+
+// Scope add task
+class Scope {
+public:
+    Scope() = default;
+
+    Scope(Scope* parent) : parentScope(parent) {}
+    ~Scope() {
+        for (auto p : values) {
+            auto expr = p.second;
+            if (expr) delete expr;
+        }
+    }
+    const Expression* GetValue(const string& key) {
+        return values.at(key);
+    }
+
+    void AddValue(const string& key, Expression* value) {
+        
+        values.insert({ key,value });
+    }
+
+    void SetValue(const string& key, Expression* value) {
+        static_cast<void>(values.at(key));
+        values[key] = value;
+    }
+
+    bool TryGet(const string& key, Expression** value) {
+        if (values.count(key)) {
+            *value = values.at(key);
+            return true;
+        }
+        return false;
+    }
+
+    bool TrySet(const string& key, Expression* value) {
+        if (values.count(key)) {
+            values[key] = value;
+            return true;
+        }
+        return false;
+    }
+    Scope* GetParent() {
+        return parentScope;
+    }
+
+private:
+    Scope* parentScope = nullptr;
+    unordered_map<string, Expression*> values;
+};
+
+//Scope Closure add task
+class ClosureExpression : public FunctionExpression {
+public:
+    ClosureExpression(FunctionExpression* func, Scope* scope)
+        : FunctionExpression(func->GetingId(), func->GetingBody()->Clone()), scope(scope) {}
+
+    Scope* GetScope() {
+        return scope;
+    }
+
+private:
+    Scope* scope;
+};
+
+class VM {
+public:
+    VM() {
+        scopeStack.push(new Scope());
+    }
+    ~VM() {
+        delete PopScope();
+    }
+
+    Expression* Eval(Expression* expression) { //func for all types
+        if (auto valExpr = dynamic_cast<Valexpression*>(expression))
+            return (Expression*)Eval(valExpr);
+
+        if (auto varExpr = dynamic_cast<VarExpression*>(expression))
+            return Eval(varExpr);
+
+        if (auto addExpr = dynamic_cast<AddExpression*>(expression))
+            return (Expression*)Eval(addExpr);
+
+        if (auto ifExpr = dynamic_cast<IfExpression*>(expression))
+            return Eval(ifExpr);
+
+        if (auto letExpr = dynamic_cast<LetExpression*>(expression))
+            return Eval(letExpr);
+
+        if (auto funcExpr = dynamic_cast<FunctionExpression*>(expression))
+            return (Expression*)Eval(funcExpr);
+
+        if (auto callExpr = dynamic_cast<CallExpression*>(expression))
+            return (Expression*)Eval(callExpr);
+
+        if (auto setExpr = dynamic_cast<SetExpression*>(expression))
+            return (Expression*)Eval(setExpr);
+
+        if (auto blockExpr = dynamic_cast<BlockExpression*>(expression))
+            return Eval(blockExpr);
+
+        throw MyException("Unknown expression type");
+    }
+
+protected:
+    Scope* CurrentScope() const {
+        return scopeStack.top();
+    }
+
+    void PushScope(Scope* scope) {
+        scopeStack.push(scope);
+    }
+
+    Scope* PopScope() {
+        auto res = scopeStack.top();
+        scopeStack.pop();
+        return res;
+    }
+
+    static Valexpression* Eval(Valexpression* val) {
+        return (Valexpression*)val->Clone();
+    }
+
+    Expression* Eval(VarExpression* var) {
+        auto id = var->GetId();
+        return FromEnv(id);
+    }
+
+    Valexpression* Eval(AddExpression* expr) {
+        auto lExpr = Eval(expr->GetLeftOperand());
+        auto rExpr = Eval(expr->GetRightOperand());
+        return new Valexpression(GetValue(lExpr) + GetValue(rExpr));
+    }
+
+    Expression* Eval(IfExpression* expr) {
+        auto valLeft = GetValue(Eval(expr->GetLeftOperand()));
+        auto valRight = GetValue(Eval(expr->GetRightOperand()));
+        return Eval(valLeft > valRight ? expr->GetThenBranch() : expr->GetElseBranch());
+    }
+
+    Expression* Eval(LetExpression* expr) {
+        auto id = expr->GetingId();
+        auto value = Eval(expr->GetingExpression());
+        Scope* scope = new Scope(CurrentScope());
+        PushScope(scope);
+        scope->AddValue(id, value);
+        auto result = Eval(expr->GetingBody());
+        delete PopScope();
+        return result;
+    }
+
+    ClosureExpression* Eval(FunctionExpression* func) {
+        return new ClosureExpression(func, CurrentScope());
+    }
+
+    Expression* Eval(CallExpression* expr) {
+        auto res = Eval(expr->GetingCall());
+        auto called = dynamic_cast<FunctionExpression*>(res);
+        if (called == nullptr)
+            throw MyException("Can't call not function expression");
+        auto closure = dynamic_cast<ClosureExpression*>(res);
+
+        auto argument = Eval(expr->GetingArg());
+
+        Scope* parentScope = closure ? closure->GetScope() : CurrentScope();
+        Scope* scope = new Scope(parentScope);
+        scope->AddValue(called->GetingId(), argument);
+        PushScope(scope);
+
+        auto result = Eval(called->GetingBody());
+        delete PopScope();
+        return result;
+    }
+
+    Expression* Eval(SetExpression* expr) {
+        auto id = expr->GetingId();
+        auto value = Eval(expr->GetExpression());
+        if (!TrySetInEnv(id, value)) {
+            throw MyException("Variable doesn't exists " + id);
+        }
+        return new Expression();
+    }
+
+    Expression* Eval(BlockExpression* block) {
+        Expression* result = nullptr;
+        Scope* scope = new Scope(CurrentScope());
+        PushScope(scope);
+        for (auto expr : block->GetExpressions()) {
+            if (result) delete result;
+            result = Eval(expr);
+        }
+        delete PopScope();
+        return result;
+    }
+
+    static int GetValue(Expression* expression) { //function that returns match int if called from type val
+        
+        auto valExpression = dynamic_cast<Valexpression*>(expression);
+        if (valExpression) return valExpression->GetValue();
+        throw MyException("Expression isn't value expression");
+    }
+
+    Expression* FromEnv(string& key) { //function that returns expression matching the given id in env
+        Expression* expr = nullptr;
+        Scope* scope;
+        for (scope = CurrentScope(); scope != nullptr; scope = scope->GetParent()) {
+            if (scope->TryGet(key, &expr)) break;
+        }
+        if (scope != nullptr) return expr->Clone();
+        throw MyException("Unknown key " + key);
+    }
+
+    bool TrySetInEnv(string& key, Expression* expression) {
+        Scope* scope;
+        for (scope = CurrentScope(); scope != nullptr; scope = scope->GetParent()) {
+            if (scope->TrySet(key, expression)) return true;
+        }
+        return false;
+    }
+
+private:
+    stack<Scope*> scopeStack;
+};
+
+
+int main() {
+    vector<string> keywords =
+    { "val", "var", "add", "if",
+     "then", "else", "let", "in",
+     "function", "call", "set", "block" }; //set for add task
+
+    ifstream fin("input.txt");
+    ofstream fout("output.txt");
+
+    try {
+        Tokenizer tokenizer(keywords, fin);
+        auto tokens = tokenizer.Tokenize();
+
+        Parser parser(tokens);
+        auto AST = parser.Parse();
+
+        VM vm;
+        auto expression = vm.Eval(AST);
+
+        if (dynamic_cast<Valexpression*>(expression) == nullptr) {
+            throw MyException("Wrong expression type");
+        }
+        fout << expression->ToString();
+        delete AST;
+        delete expression;
+
+        for (auto i : tokens) {
+            delete i;
+        }
+    }
+    catch (MyException e) {
+        fout << "ERROR";
+    }
+}
