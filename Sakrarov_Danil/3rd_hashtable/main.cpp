@@ -104,8 +104,8 @@ public:
             end_it = end1;
         }
 
-        Slot<K, V> &operator*() {
-            return *curr_it;
+        std::pair<K,V> operator*() {
+            return std::make_pair(curr_it->getKey(),curr_it->getValue());
         }
 
         Iterator &operator++() {
@@ -170,7 +170,7 @@ public:
 
         auto tmp = HashMap<K, V>(size * 2);
         for (auto it:*this) {
-            tmp.addElement(it.getKey(), it.getValue());
+            tmp.addElement(it.first, it.second);
         }
 
         delete[] table;
@@ -248,8 +248,7 @@ void start(std::ifstream &fin, const std::string &out) {
 
     HashMap<V, bool> mapOfValues(Table.get_size()); //values as keys for cont unique elements
     for (auto it: Table) {
-        if (it.getFilled())
-            mapOfValues.addElement(it.getValue(), 1);
+            mapOfValues.addElement(it.second, 1);
     }
 
     fout << Table.get_cap() << " " << mapOfValues.get_cap();;
