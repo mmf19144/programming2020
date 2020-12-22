@@ -22,7 +22,7 @@ public:
 	{
 		msize = size;
 		marr = new int* [msize];
-		for (int count = 0; count < msize; count++)
+		for (size_t count = 0; count < msize; count++)
 			marr[count] = new int[msize];
 		for (size_t i = 0; i < msize; i++)
 			for (size_t j = 0; j < msize; j++)
