@@ -35,9 +35,9 @@ public:
 		return size;
 	}
 
-	HashMap(int size, double max_load_factor0) {
+	HashMap(int size0, double max_load_factor0) {
 		max_load_factor = max_load_factor0;
-		table.resize(size);
+		table.resize(size0);
 		size = 0;
 	}
 
