@@ -63,10 +63,13 @@ public:
 };
 
 class Matrix {
+public:
     const size_t matrix_size;
+private:
     int *const data;
 
 public:
+
     Matrix()
             : matrix_size(0), data(nullptr) {
     }
@@ -211,32 +214,3 @@ public:
     }
 
 };
-
-int main() {
-    std::ifstream input("input.txt");
-    std::ofstream output("output.txt");
-    size_t n;
-    int k;
-    input >> n >> k;
-
-    int *k_arr = new int[n];
-    for (size_t i = 0; i < n; i++) {
-        k_arr[i] = k;
-    }
-
-    Matrix A(n);
-    Matrix B(n);
-    Matrix C(n);
-    Matrix D(n);
-    Matrix K(n, k_arr);
-    input >> A >> B >> C >> D;
-
-    output << ((A + (B * C.transposed()) + K) * D.transposed());
-    input.close();
-    output.close();
-    return 0;
-}
-
-
-
-

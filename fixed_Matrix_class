@@ -1,0 +1,200 @@
+#include <fstream>
+#include <cstring>
+
+class Matrix {
+private:
+	size_t size;
+	int* arr;
+
+public:
+	Matrix()
+		:size(0), arr(nullptr) {}
+
+	Matrix(size_t size)
+		:size(size) {
+		arr = new int [size*size];
+
+		memset(arr, 0, size * size * sizeof(int));
+		for (size_t j = 0; j < size; j++) {
+			arr[j * size + j] = 1;
+		}
+	}
+
+	Matrix(size_t size, int* diag)
+		:size(size) {
+		arr = new int [size * size];
+		
+		memset(arr, 0, size * size * sizeof(int));
+		for (size_t j = 0; j < size; j++) {
+			arr[j * size + j] = diag[j];
+		}
+	}
+
+	Matrix(const Matrix& A) : size{ A.size }
+	{
+		arr = new int [size * size];
+
+		for (size_t i = 0; i < size * size; i++) {
+			arr[i] = A.arr[i];
+		}
+	}
+
+	~Matrix() {
+		if (size > 0) {
+			delete[] arr;
+		}
+	}
+
+	const Matrix operator + (const Matrix& b) const {
+		if (size == b.size) {
+			Matrix c(size);
+
+			for (size_t i = 0; i < size * size; i++) {
+				c.arr[i] = arr[i] + b.arr[i];
+			}
+			return c;
+		}
+		else {
+			throw std::range_error("Size_Error");
+		}
+	}
+
+	const Matrix operator - (const Matrix& b) const {
+		if (size == b.size) {
+			Matrix c(size);
+
+			for (size_t i = 0; i < size * size; i++) {
+				c.arr[i] = arr[i] - b.arr[i];
+			}
+			return c;
+		}
+		else {
+			throw std::range_error("Size_Error");
+		}
+	}
+
+	const Matrix operator * (const Matrix& b) const {
+		if (size == b.size) {
+			Matrix c(size);
+
+			int buf = 0;
+			for (size_t i = 0; i < size; i++) {
+				for (size_t j = 0; j < size; j++) {
+					buf = 0;
+					for (size_t k = 0; k < size; k++) {
+						buf += arr[i * size + k] * b.arr[k * size + j];
+					}
+					c.arr[i * size + j] = buf;
+				}
+			}
+			return c;
+		}
+		else {
+			throw std::range_error("Size_Error");
+		}
+	}
+
+	const bool operator == (const Matrix& b) const {
+		if (size == b.size) {
+			int count = 0;
+			for (size_t i = 0; i < size * size; i++) {
+				if (arr[i] != b.arr[i]) {
+					return false;
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+
+	const Matrix operator ! () const {//транспонирование
+		Matrix c(size);
+		for (size_t i = 0; i < size; i++) {
+			for (size_t j = 0; j < size; j++) {
+				c.arr[i * size + j] = arr[j * size + i];
+			}
+		}
+		return c;
+	}
+
+	const Matrix Minor(size_t idx1, size_t idx2) {
+		if (idx1 <= size || idx2 <= size) {
+			Matrix c(size - 1);
+			for (size_t i = 0; i < c.size; i++) {
+				for (size_t j = 0; j < c.size; j++) {
+					if (i < idx1 && j < idx2) {
+						c.arr[i * size + j] = arr[i * size + j];
+					}
+					if (i < idx1 && j > idx2) {
+						c.arr[i * size + j - 1] = arr[i * size + j];
+					}
+					if (i > idx1&& j < idx2) {
+						c.arr[(i - 1) * size + j] = arr[i * size + j];
+					}
+					if (i > idx1&& j > idx2) {
+						c.arr[(i - 1) * size + j - 1] = arr[i * size + j];
+					}
+				}
+			}
+		}
+		else {
+			throw std::range_error("Index_Error");
+		}
+
+	}
+
+	friend std::ostream& operator << (std::ostream& out, const Matrix& a)
+	{
+		for (size_t i = 0; i < a.size; i++)
+		{
+			for (size_t j = 0; j < a.size; j++)
+			{
+				out << a.arr[i * a.size + j] << " ";
+			}
+			out << std::endl;
+		}
+		return out;
+	}
+
+	friend std::istream& operator >> (std::istream& in, Matrix& a)
+	{
+		for (size_t i = 0; i < a.size; i++)
+		{
+			for (size_t j = 0; j < a.size; j++)
+			{
+				in >> a.arr[i * a.size + j];
+			}
+		}
+		return in;
+	}
+};
+
+
+int main() {
+
+	std::ifstream fin{ "input.txt" };
+	std::ofstream fout{ "output.txt" };
+
+	size_t size;
+	fin >> size;
+
+	int k;
+	fin >> k;
+
+	int* k_diag = new int[size];
+	for (size_t i = 0; i < size; i++) {
+		k_diag[i] = k;
+	}
+
+	Matrix A(size);
+	Matrix B(size);
+	Matrix C(size);
+	Matrix D(size);
+	Matrix K(size, k_diag);
+
+	fin >> A >> B >> C >> D;
+
+	fout << (A + (B * (!C)) + K) * (!D) << std::endl;
+
+	return 0;
+}
