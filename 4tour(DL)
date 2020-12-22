@@ -1,9 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-#include <stdio.h>
+#include <cstdio>
+#include <cstring>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <variant>
 #include <iostream>
 #include <fstream>
 
@@ -15,34 +17,7 @@ bool is_digit(char st) {
 
 class Function;
 
-class Num_Fun {
-private:
-	int num;
-	bool is_num;
-	Function* fun;
-public:
-	Num_Fun(int num0 = 0) {
-		num = num0;
-		is_num = true;
-	}
-	Num_Fun(Function* fun0) {
-		fun = fun0;
-		is_num = false;
-	}
-	int Get_num()const{
-		return num;
-	}
-	int Get_is_num()const {
-		return is_num;
-	}
-	Function* Get_fun() const {
-		return fun;
-	}
-
-	operator int() {
-		return num;
-	}
-};
+typedef variant<int, Function*> Num_Fun;
 
 typedef unordered_map <string, Num_Fun> Env;
 
@@ -51,11 +26,11 @@ private:
 
 public:
 	virtual Num_Fun eval(Env& env) = 0;
-	~Expression(){}
+	virtual ~Expression() {}
 };
 
 
-class Val : public Expression{
+class Val : public Expression {
 private:
 	int val;
 public:
@@ -88,7 +63,7 @@ private:
 	Expression* e2;
 public:
 	virtual Num_Fun eval(Env& env) {
-		return Num_Fun(e1->eval(env) + e2->eval(env));
+		return Num_Fun(get<int>(e1->eval(env)) + get<int>(e2->eval(env)));
 	}
 	Add(Expression* e10, Expression* e20) {
 		e1 = e10;
@@ -121,7 +96,7 @@ public:
 		e_then = e_then0;
 		e_else = e_else0;
 	}
-	~If(){
+	~If() {
 		delete e1;
 		delete e2;
 		delete e_then;
@@ -145,7 +120,7 @@ public:
 		e_value = e_value0;
 		e_body = e_body0;
 	}
-	~Let(){
+	~Let() {
 		delete e_value;
 		delete e_body;
 	}
@@ -181,12 +156,12 @@ private:
 public:
 	virtual Num_Fun eval(Env& env) {
 		Num_Fun f = f_expr->eval(env);
-		if (f.Get_is_num())
+		if (holds_alternative<int>(f))
 			throw exception();
-		
-		Function* fn = f.Get_fun();
+
+		Function* fn = get<Function*>(f);
 		string id = fn->Get_f_arg_id();
-		Expression *e = fn->Get_f_body();
+		Expression* e = fn->Get_f_body();
 
 		Env env1 = env;
 		env1[id] = arg_expr->eval(env);
@@ -236,7 +211,7 @@ vector <string> getlex(istream& in) {
 	return res;
 }
 
-Expression* parse(vector<string> l, int &pos) {
+Expression* parse(vector<string> l, int& pos) {
 	Expression* res;
 
 	if (l[pos++] != "(") {
@@ -266,7 +241,7 @@ Expression* parse(vector<string> l, int &pos) {
 		pos++;
 		Expression* e1 = parse(l, pos);
 		Expression* e2 = parse(l, pos);
-		if (l[pos++]!="then") {
+		if (l[pos++] != "then") {
 			throw exception();
 		}
 		Expression* e_then = parse(l, pos);
@@ -322,6 +297,7 @@ int main() {
 	//auto &fout = cout;
 
 	std::ifstream fin("input.txt");
+	//auto &fin = cin;
 
 	int pos = 0;
 
@@ -338,9 +314,9 @@ int main() {
 
 	try {
 		Num_Fun n = e->eval(env);
-		if (!n.Get_is_num())
+		if (!holds_alternative<int>(n))
 			throw exception();
-		fout << "(val " << n.Get_num() << ")" << endl;
+		fout << "(val " << get<int>(n) << ")" << endl;
 	}
 	catch (exception e) {
 		fout << "ERROR" << endl;
