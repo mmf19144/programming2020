@@ -7,123 +7,148 @@
 #include <atomic>
 #include <chrono>
 #include <ctime>
-#include <direct.h>
 #include <string>
+
 using namespace std;
 
-string dlpath = "0path/";
-string href = "<a href = \"file://";
-atomic<int> counter = 0;
-bool notified = false;
-bool done = false;
-int thrWait = 0, thrs;
-condition_variable cond;
-queue<string> order;
-mutex morder, mmarks;
-set<string> marks;
+string downloadRepository = "C:\\crawler\\";
 
-string setNice(string fn) { 
-	fn.erase(fn.begin(), fn.begin() + 7);
-	return fn;
-}
+class Crawler {
+public:
+    Crawler(int count, string input) : countThreads(count), startPath(input){
+        toProcessed.push(input);
+        processed.insert(input);
+    }
 
-void bfs(int thrCnt) {
-	string cur;
-	if (thrCnt > 0) {
-		thread next(bfs, thrCnt - 1);
-		next.detach();
-	}
-	
-	while (!done) {
-		cout << counter << endl;
-		unique_lock<mutex> locker(morder);
-		if (order.empty() && thrWait == thrs - 1) {
-			done = true;
-			cond.notify_all();
-		}
+    void ThreadNewFileAdd (string href){
+        lock_guard<mutex> lockGuard(contLock);
+        if(processed.find(href) == processed.end()){
+            allStartTasks++;
+            toProcessed.push(href);
+        }
+    }
 
-		thrWait++;
-		while (!notified) {
-			cond.wait(locker);
-		}
-		thrWait--;
+    static void ThreadCopyFile(string filename) {
+        ifstream in(filename);
+        string outputFile = downloadRepository + filename;
+        ofstream out(outputFile);
+        string input;
+        out << in.rdbuf();
+        in.close();
+        out.close();
+    }
 
-		if (!order.empty() && !done) {
-			cur = order.front();
-			order.pop();
-		}
+    void ThreadAddDoneFile(string filename) {
+        lock_guard<mutex> lockGuard(contLock);
+        processed.insert(filename);
+    }
+    pair<bool, string> ThreadGetNewFile() {
+        lock_guard<mutex> guard(contLock);
+        if(!toProcessed.empty()) {
+            string nextFile = toProcessed.front();
+            toProcessed.pop();
+            return make_pair(true, nextFile);
+        }
+        return make_pair(false, "");
+    }
 
-		if (order.empty()) {
-			notified = false;
-		}
+    void ThreadProcessFile(string file) {
+        {
+            lock_guard<mutex> lockGuard(contLock);
+            if(processed.find(file) != processed.end() && file != startPath){
+                return;
+            }
+        }
+        ifstream in(file);
+        ThreadCopyFile(file);
+        string line;
+        char c;
+        vector<string> hrefs;
 
-		counter++;
-		cout << counter;
-		char c;
-		string str;
-		ifstream fin(cur);
-		ofstream fout(dlpath + cur);
-		cout << 'a';
-		while (!fin.eof()) {
-			cout << 'a';
-			getline(fin, str);
-			fout << str;
-			for (size_t i = str.find(href, 0); i != string::npos; i = str.find(href, i + 1)) {
-				cur.clear();
-				i = i + href.length();
-				while (str[i] != '\"') {
-					cur += str[i];
-					i++;
-				}
-				cout << endl << cur << endl;
-				mmarks.lock();
-				if (marks.find(cur) == marks.end()) {
-					cout << cur << endl;
-					marks.insert(cur);
-					cout << 'a';
-					mmarks.unlock();
-					//cout << morder.try_lock();
-					morder.lock();
-					cout << 'a';
-					order.push(cur);
-					cout << 'a';
-					notified = true;
-					cond.notify_one();
-					morder.unlock();
-				}
-				else {
-					mmarks.unlock();
-				}
+        while(in) {
+            line.clear();
+            c = in.get();
+            if(c == '<' && in.get() == 'a' ) {
+                while(c != '\"')
+                    c = in.get();
+                c = in.get();
+                while(c != '\"') {
+                    line += c;
+                    c = in.get();
+                }
+                // line = "file://...."
+                hrefs.push_back(line.substr(7));
+            }
+        }
+        for(auto i : hrefs)
+            ThreadNewFileAdd(i);
+        ThreadAddDoneFile(file);
+    }
 
-				cout << 'b';
-			}
-			fin.close();
-			fout.close();
-		}
+    void ThreadProgram() {
+        bool equal;
+        do {
+            equal = (endedTasks.load() == allStartTasks.load());
+            auto file = ThreadGetNewFile();
+            if(file.first){
+                ThreadProcessFile(file.second);
+                endedTasks++;
+                equal = false;
+            }
+            {
+                lock_guard<mutex> lockGuard(contLock);
+                cout << processed.size() << " " << allStartTasks.load() << " " << endedTasks.load() << endl;
+            }
+        } while(!equal);
+        cout << "Thread id = " <<  this_thread::get_id() << " end!" << endl;
+    }
 
-		
-	}
-	return;
-}
+    pair<int, int> crawl() {
+        cout << "Num of Threads = " << countThreads << endl;
+        this_thread::sleep_for(chrono::milliseconds(2000));
 
-int main() {
-	using namespace std::chrono;
+        pair<int, int> result;
+        chrono::time_point<chrono::system_clock> start, end;
+        start = chrono::system_clock::now();
 
-	steady_clock::time_point t1 = steady_clock::now();
-	_mkdir("0pack/");
-	string str;
-	cin >> str;
-	str = setNice(str);
-	order.push(str);
-	marks.insert(str);
-	cin >> thrs;
-	thread thread1(bfs, thrs - 1);
-	notified = true;
-	
+        allStartTasks.store(1);
+        endedTasks.store(0);
+        for(int i = 0; i < countThreads; ++i)
+            threads.push_back(thread(&Crawler::ThreadProgram, ref(*this)));
+        for(int i = 0; i < countThreads; ++i) {
+            threads[i].join();
+        }
 
-	steady_clock::time_point t2 = steady_clock::now();
+        end = chrono::system_clock::now();
+        int time = chrono::duration_cast<chrono::microseconds>(end - start).count();
+        result.second = time;
+        result.first = processed.size();
+        return result;
+    }
 
-	duration<double> dur = duration_cast<duration<double>>(t2 - t1);
 
-	cout << counter << ' ' << dur.count() << '\n';
+private:
+    string startPath;
+    int countThreads;
+    vector<thread> threads;
+    queue<string> toProcessed;
+    set<string> processed;
+    mutex contLock;
+    atomic<int> allStartTasks;
+    atomic<int> endedTasks;
+};
+
+int main(){
+    ifstream fin("input.txt");
+    string inp;
+    int numThreads;
+    fin >> inp >> numThreads;
+    fin.close();
+
+    Crawler crawler(numThreads, inp);
+    pair<int, int> result = crawler.crawl();
+    ofstream fout("output.txt");
+    fout << result.first << " " << result.second << " microsec";
+    fout.close();
+    return 0;
 }
