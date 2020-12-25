@@ -38,20 +38,23 @@ set <string> open_page(string page) {
 	return result;
 }
 
-void index(mutex& links_mutex, mutex& time_mutex, set <string>& opened_links, set <string>& links_to_open, chrono::system_clock::time_point& last_link_adding_time) {
-	string cur_page = "";
-	
+void index(mutex& links_mutex, set <string>& opened_links, set <string>& links_to_open, condition_variable& cond_var, atomic_int& cnt) {
+
 	while (1) {
-		links_mutex.lock();
+		string cur_page = "";
+		unique_lock<mutex> lock_(links_mutex);
+		cond_var.wait(lock_, [links_to_open] {return !links_to_open.empty(); });
+		cnt++;
+
 		if (!links_to_open.empty()) {
 			cur_page = *links_to_open.begin();
 			links_to_open.erase(cur_page);
 			opened_links.insert(cur_page);
-			links_mutex.unlock();
+			lock_.unlock();
 		}
 		else {
-			links_mutex.unlock();
-			this_thread::sleep_for(chrono::seconds(10));
+			lock_.unlock();
+			this_thread::sleep_for(chrono::seconds(3));
 			continue;
 		}
 		set <string> found_pages = open_page(cur_page);
@@ -60,28 +63,26 @@ void index(mutex& links_mutex, mutex& time_mutex, set <string>& opened_links, se
 		for (auto page : found_pages) {
 			if (opened_links.find(page) == opened_links.end() && links_to_open.find(page) == links_to_open.end()) {
 				links_to_open.insert(page);
+				cond_var.notify_one();
 			}
 		}
 		cout << opened_links.size() << endl;
 		links_mutex.unlock();
-		if (!found_pages.empty()) {
-			time_mutex.lock();
-			last_link_adding_time = chrono::system_clock::now();
-			time_mutex.unlock();
-		}
+		cnt--;
 	}
 }
 
 size_t start_indexing(string start_page, size_t threads_num) {
+	atomic_int cnt = 0;
+	condition_variable cond_var;
 	set <string> opened_links;
 	set <string> links_to_open;
 	mutex links_mutex;
-	mutex time_mutex;
 	vector <thread> threads;
-	auto last_link_adding_time = chrono::system_clock::now();
 	links_to_open.insert(start_page);
+
 	for (size_t i = 0; i < threads_num; i++) {
-		threads.emplace_back(index, ref(links_mutex), ref(time_mutex), ref(opened_links), ref(links_to_open), ref(last_link_adding_time));
+		threads.emplace_back(index, ref(links_mutex), ref(opened_links), ref(links_to_open), ref(cond_var), ref(cnt));
 	}
 
 	for (auto& t : threads)
@@ -89,15 +90,20 @@ size_t start_indexing(string start_page, size_t threads_num) {
 		t.detach();
 	}
 
+	cond_var.notify_all();
+	this_thread::sleep_for(chrono::seconds(5));
+	
 
 	while (1) {
-		time_mutex.lock();
-		chrono::duration<double> past_time = chrono::system_clock::now() - last_link_adding_time;
-		time_mutex.unlock();
-		if (past_time.count() > 3) {
+		links_mutex.lock();
+		size_t links_to_open_size = links_to_open.size();
+		links_mutex.unlock();
+		if (cnt && links_to_open_size) {
+			this_thread::sleep_for(chrono::seconds(2));
+		}
+		else {
 			break;
 		}
-		this_thread::sleep_for(chrono::seconds(2));
 	}
 	return opened_links.size();
 }
