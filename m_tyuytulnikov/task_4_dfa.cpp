@@ -53,7 +53,7 @@ private:
     set<char> letters;
     vector<char> letter_of_position;
 
-    class State {
+    class State { //Абстрактный класс для формирования дерева regex
     public:
         virtual bool isNullable() = 0;
 
@@ -66,7 +66,7 @@ private:
         virtual ~State() = default;
     };
 
-    class DotState : public State {
+    class DotState : public State { //Точка
     private:
         unique_ptr<State> stateLeft;
         unique_ptr<State> stateRight;
@@ -108,7 +108,7 @@ private:
 
     };
 
-    class NodeState : public State {
+    class NodeState : public State { //Символ
         size_t position;
     public:
         explicit NodeState(size_t position) {
@@ -131,7 +131,7 @@ private:
         }
     };
 
-    class OrState : public State {
+    class OrState : public State { //Состояние ИЛИ
         unique_ptr<State> stateLeft;
         unique_ptr<State> stateRight;
     public:
@@ -164,7 +164,7 @@ private:
 
     };
 
-    class StarState : public State {
+    class StarState : public State { //Звездочка
         unique_ptr<State> state;
     public:
         explicit StarState(unique_ptr<State> state) {
@@ -283,7 +283,7 @@ private:
                     break;
                 }
                 case chara: {
-                    string str ={character};
+                    string str = {character};
                     if (!polish.empty()) {
                         str += ".";
                     }
@@ -341,8 +341,8 @@ public:
     explicit DFA(const string &regex) :
             start_state(0) {
         string polish = convertRegexToPolishForm(regex);
-        auto state = convertRegexToTree(polish);
-        letters.erase('#');
+        auto state = convertRegexToTree(polish); //Конвертируем regex string в дерево стейтов
+        letters.erase('#'); //Убираем разграничивающую #
 
         vector<vector<size_t>> vec(letter_of_position.size(), vector<size_t>());
         state->calculateFollowers(vec);
@@ -357,7 +357,7 @@ public:
         queue<set<size_t>> currentStates;
         currentStates.push(firstState);
         currentState++;
-        while (!currentStates.empty()) {
+        while (!currentStates.empty()) { //Обход по стейтам
             set<size_t> positions = currentStates.front();
             currentStates.pop();
             size_t position = statesToState[positions];
@@ -367,7 +367,7 @@ public:
                     if (letter_of_position[pos] == c) {
                         vector<size_t> followPos = vec[pos];
                         for (size_t follow : followPos) {
-                            nextState.insert(follow);
+                            nextState.insert(follow); //Добавляем в стейты из дерева
                         }
                     }
                 }
