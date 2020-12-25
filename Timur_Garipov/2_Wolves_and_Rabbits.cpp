@@ -26,7 +26,6 @@ public:
     }
     void checkBorder(int N, int M) {
 
-
         if (this->x >= N) {
             this->x = this->x - N;
         }
@@ -130,18 +129,18 @@ protected:
             this->count_step = 0;
 
             switch (direction) {
-            case up:
-                direction = right;
-                break;
-            case right:
-                direction = down;
-                break;
-            case down:
-                direction = left;
-                break;
-            case left:
-                direction = up;
-                break;
+                case up:
+                    direction = right;
+                    break;
+                case right:
+                    direction = down;
+                    break;
+                case down:
+                    direction = left;
+                    break;
+                case left:
+                    direction = up;
+                    break;
             }
         }
     }
@@ -149,18 +148,18 @@ protected:
         int step = dim_of_step;
 
         switch (this->direction) {
-        case up:
-            this->coordinates.y -= step;
-            break;
-        case right:
-            this->coordinates.x += step;
-            break;
-        case down:
-            this->coordinates.y += step;
-            break;
-        case left:
-            this->coordinates.x -= step;
-            break;
+            case up:
+                this->coordinates.y -= step;
+                break;
+            case right:
+                this->coordinates.x += step;
+                break;
+            case down:
+                this->coordinates.y += step;
+                break;
+            case left:
+                this->coordinates.x -= step;
+                break;
         }
 
         this->coordinates.checkBorder(N, M);
@@ -229,7 +228,7 @@ public:
 
         this->dim_of_step = 2;
     }
-    void eating(std::vector<Rabbit>& rabbits) {
+    void eating(std::vector<Rabbit> &rabbits) {
         int countFoods = 0;
         int count = rabbits.size();
 
@@ -259,171 +258,20 @@ public:
     }
 };
 
-class point_Animal {
-public:
-    char className;
-    int age;
-    int order;
-    point_Animal(char className, int age, int order) {
-        this->className = className;
-        this->age = age;
-        this->order = order;
-    };
-};
-
-class Shakal : public Animal {
-private:
-    int statWeak;
-    int killstreak;
-    static bool compareFuncShakal(int i, int j, const std::vector<Shakal>& Shakals) {
-
-        if (Shakals[i].statWeak > Shakals[j].statWeak)
-            return true;
-        else if (Shakals[i].statWeak < Shakals[j].statWeak)
-            return false;
-        else {
-            if (Shakals[i].age < Shakals[j].age)
-                return true;
-            else
-                return false;
-        }
-    }
-    static bool compareFuncAnimals(int i, int j, const std::vector<point_Animal>& Array) {
-        if (Array[i].age < Array[j].age)
-            return true;
-        else
-            return false;
-    }
-public:
-    Shakal(coordinate coor, int dir, int k) {
-        this->statDie = 0;
-        this->statWeak = 0;
-        this->age = 0;
-        this->constancy = k;
-        this->coordinates = coor;
-        this->count_step = 0;
-        this->direction = (direct)dir;
-        this->killstreak = 0;
-        this->dim_of_step = 2;
-    }
-    int getStatWeak() {
-        return statWeak;
-    }
-    static void eating(std::vector<Rabbit>& rabbits, std::vector<Wolf>& wolves, std::vector<Shakal>& shakals, Pole& gr_rabbits, Pole& gr_wolves, Pole& gr_shakals) {
-
-        for (int i = 0; i < gr_shakals.N; i++)
-            for (int j = 0; j < gr_shakals.M; j++) {
-
-
-                if (gr_shakals.massive[i][j].value) {
-
-
-                    Shakal* main_shk;
-                    int size = gr_shakals.massive[i][j].value;
-                    for (int k = 0; k < size; k++)
-                        for (int k1 = k + 1; k1 < size; k1++) {
-                            if (compareFuncShakal(k, k1, shakals)) {
-                                int support = gr_shakals.massive[i][j].arr_order[k];
-                                gr_shakals.massive[i][j].arr_order[k] = gr_shakals.massive[i][j].arr_order[k1];
-                                gr_shakals.massive[i][j].arr_order[k1] = support;
-                            }
-                        }
-                    main_shk = &shakals[gr_shakals.massive[i][j].arr_order[0]];
-
-
-                    std::vector<point_Animal> Animals_in_cell;
-
-                    for (int z = 1; z < size; z++) {
-                        point_Animal C('s', shakals[gr_shakals.massive[i][j].arr_order[z]].age, gr_shakals.massive[i][j].arr_order[z]);
-                        Animals_in_cell.push_back(C);
-                    }
-
-                    size = gr_rabbits.massive[i][j].value;
-                    for (int z = 0; z < size; z++) {
-                        point_Animal C('r', rabbits[gr_rabbits.massive[i][j].arr_order[z]].getAge(), gr_rabbits.massive[i][j].arr_order[z]);
-                        Animals_in_cell.push_back(C);
-                    }
-
-                    size = gr_wolves.massive[i][j].value;
-                    for (int z = 0; z < size; z++) {
-                        point_Animal C('w', wolves[gr_wolves.massive[i][j].arr_order[z]].getAge(), gr_wolves.massive[i][j].arr_order[z]);
-                        Animals_in_cell.push_back(C);
-                    }
-
-
-                    size = Animals_in_cell.size();
-                    for (int i1 = 0; i1 < size; i1++)
-                        for (int j1 = i1 + 1; j1 < size; j1++)
-                            if (compareFuncAnimals(i1, j1, Animals_in_cell)) {
-                                point_Animal support = Animals_in_cell[i1];
-                                Animals_in_cell[i1] = Animals_in_cell[j1];
-                                Animals_in_cell[j1] = support;
-                            }
-
-
-                    int countFood = 0;
-                    int z1 = 0;
-                    for (; countFood != 2 || z1 < size;) {
-                        main_shk->killstreak++;
-
-                        switch (Animals_in_cell[z1].className) {
-                        case 'r':
-                            rabbits[Animals_in_cell[z1].order].mustDie();
-                            break;
-                        case 'w':
-                            wolves[Animals_in_cell[z1].order].mustDie();
-                            break;
-                        case 's':
-                            shakals[Animals_in_cell[z1].order].mustDie();
-                            break;
-                        }
-                        z1++;
-                        countFood++;
-                    }
-
-                    if (countFood == 2)
-                        main_shk->mustWeak();
-                }
-            }
-    }
-    void reproduction(std::vector<Shakal>& str) {
-        if (this->killstreak == 2) {
-            str.push_back(Shakal(this->coordinates, this->direction, this->constancy));
-            this->killstreak = 0;
-        }
-    }
-    void mustDie() override {
-        if (this->age == 15) {
-            statDie = 1;
-        }
-    }
-    void mustWeak() {
-        if (this->killstreak == 2) {
-            statWeak = 1;
-        }
-    }
-    void iterLoop(int N, int M, std::vector<Rabbit>& rabbits, std::vector<Wolf>& wolves, std::vector<Shakal>& shakals) {
-        growUp();
-        makeMove(N, M);
-    }
-};
-
 class Simulation {
 private:
     std::string input_file;
     std::string output_file;
     int count_rabbits,
-        count_wolves;
+            count_wolves;
     int timeSim;
     Field field;
 
     std::vector<Wolf> vect_wolf;
     std::vector<Rabbit> vect_rabbit;
-    std::vector<Shakal> vect_shakals;
 
     Pole* ground_rabbits,
-        * ground_wolves,
-        * ground_shakals;
+            * ground_wolves;
 public:
     int getCountRab() {
         return count_rabbits;
@@ -492,7 +340,7 @@ public:
     void startSimulation() {
         coordinate z(field.getXdim(), field.getYdim());
         int countRab = vect_rabbit.size(),
-            countWolves = vect_wolf.size();
+                countWolves = vect_wolf.size();
 
         for (int i = 0; i < this->timeSim; i++) {
             countRab = vect_rabbit.size();
@@ -515,7 +363,7 @@ public:
 
 
                         int size_for_sort = ground_wolves->massive[i][j].arr_order.size();
-                        for (int i1 = 0; i1 < size_for_sort; i1++)
+                        for(int i1 = 0; i1 < size_for_sort; i1++)
                             for (int j1 = i1 + 1; j1 < size_for_sort; j1++)
                                 if (vect_wolf[ground_wolves->massive[i][j].arr_order[i1]].getAge() <
                                     vect_wolf[ground_wolves->massive[i][j].arr_order[j1]].getAge()) {
@@ -529,7 +377,7 @@ public:
                         vect_wolf[ground_wolves->massive[i][j].arr_order[0]].eating(vect_rabbit);
 
                         ground_wolves->massive[i][j].value = ground_wolves->massive[i][j].value +
-                            vect_wolf.size() - prev_size;
+                                                             vect_wolf.size() - prev_size;
                         ground_rabbits->massive[i][j].value = 0;
                     }
 
@@ -563,7 +411,7 @@ public:
     void printResult() {
         std::ofstream fout("output.txt");
         int N = field.getXdim(),
-            M = field.getYdim();
+                M = field.getYdim();
         updatePole(vect_wolf.size(), vect_rabbit.size());
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < M; j++) {
