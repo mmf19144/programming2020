@@ -12,14 +12,13 @@ using namespace std;
 class Env;
 
 
-
 class Expression {
 public:
 	virtual Expression* eval (Env* data) = 0;
     virtual ~Expression() {}
 };
 
-int getValue(Expression* expression);
+int get_value(Expression* expression);
 
 class Env  {
     unordered_map<string, Expression*> env;
@@ -27,8 +26,6 @@ class Env  {
     friend class Let;
     friend class Call;
 public:
-    //Env(unordered_map<string, Expression*> env) : env(env) {};
-
     Env& operator=(const Env& other){
         if (this != &other){
             env = other.env;
@@ -40,38 +37,44 @@ public:
         return env.at(id);
     }
 };
+
 class Val: public Expression {
     int val;
-    friend int getValue(Expression* expression);
+    friend int get_value(Expression* expression);
 public:
     Val(int val) : val(val) {}
     virtual Expression* eval(Env* data) {
         return this;
     }
 };
+
 class Var: public Expression {
     string id;
 public:
-    Var(string& id) : id(id) {}
+    Var(string& id) : id(id) 
+    {
+
+    }
     virtual Expression* eval(Env* data) {
-        data->env[id] = this;
         return data->fromEnv(id);
     }
 };
+
 class Add: public Expression {
     Expression* left;
     Expression* right;
 public:
     Add(Expression* left, Expression* right) : left(left), right(right) {}
     virtual Expression* eval(Env* data) {
-        Env data_copy = *data;
-        return new Val(getValue(left->eval(&data_copy)) + getValue(left->eval(&data_copy)));
+        return new Val(get_value(left->eval(data)) + get_value(right->eval(data)));
     }
     virtual ~Add(){
         delete right;
         delete left;
     }
-}; class Function : public Expression {
+}; 
+
+class Function : public Expression {
     string id;
     Expression* expression;
     Env env;
@@ -86,13 +89,6 @@ public:
     virtual ~Function() {
         delete expression;
     }
-
-    Env get_env() {
-        return this->env;
-    }
-    void set_env(Env env_) {
-        env = env_;
-    }
 };
 
 class Let : public Expression {
@@ -104,13 +100,8 @@ public:
     Let(string& id, Expression* e_value, Expression* e_body) : id(id), e_value(e_value), e_body(e_body) {}
 
     virtual Expression* eval(Env* data){
-        Env data_copy = *data;
-        data_copy.env[id] = e_value->eval(&data_copy);
-        Function* f = dynamic_cast<Function*> (e_value->eval(&data_copy));
-        if (f) {
-            f->set_env(data_copy);
-        }
-        return e_body->eval(&data_copy);
+        data->env[id] = e_value->eval(data);
+        return e_body->eval(data);
     }
 
     virtual ~Let()
@@ -119,6 +110,7 @@ public:
         delete e_body;
     }
 };
+
 class If : public Expression {
     Expression* left;
     Expression* right;
@@ -127,12 +119,11 @@ class If : public Expression {
 public:
     If(Expression* left, Expression* right, Expression* e_then, Expression* e_else): left(left), right(right), e_else(e_else), e_then(e_then) {}
     virtual Expression* eval (Env* data){
-        Env data_copy = *data;
-        if (getValue(left->eval(&data_copy)) > getValue(right->eval(&data_copy))){
-            return e_then->eval(&data_copy);
+        if (get_value(left->eval(data)) > get_value(right->eval(data))){
+            return e_then->eval(data);
         }
         else{
-            return e_else->eval(&data_copy);
+            return e_else->eval(data);
         }
     }
     virtual ~If() {
@@ -142,6 +133,7 @@ public:
         delete e_then;
     }
 };
+
 class Call: public Expression {
     Expression* f_expr;
     Expression* arg_expr;
@@ -149,33 +141,15 @@ public:
     Call(Expression* f_expr, Expression* arg_expr) : f_expr(f_expr), arg_expr(arg_expr) {}
 
     virtual Expression* eval(Env* data) {
-        Env data_copy = *data;
-        Expression* eval_f = f_expr->eval(&data_copy);
+        Expression* eval_f = f_expr->eval(data);
         Function* f_expr_func = dynamic_cast<Function*>(eval_f);
         if (f_expr_func) {
-
-            Env f_env = f_expr_func->get_env();
-
-            if (data_copy.env.find(f_expr_func->id) != data_copy.env.end()) {
-                data_copy.env[f_expr_func->id] = arg_expr->eval(&data_copy);
-            }
-            else {
-                f_env.env.emplace(f_expr_func->id, arg_expr->eval(&data_copy));
-            }
-
-            return f_expr_func->expression->eval(&f_env);
+                data->env[f_expr_func->id] = arg_expr->eval(data);
+            return f_expr_func->expression->eval(data);
         }
         else {
             throw invalid_argument("error");
         }
-       /* if(f_expr_var != nullptr) {
-            data_copy.env[f_expr_var->id] = f_expr 
-        }
-        if (f_expr_func == nullptr) {
-            throw invalid_argument("f_expr is not function");
-        }
-        data_copy.env[f_expr_func->id] = arg_expr ->eval(&data_copy);
-        return f_expr_func->expression->eval(&data_copy);*/
     }
     virtual ~Call() {
         delete f_expr;
@@ -183,7 +157,7 @@ public:
     }
 };
 
-int getValue(Expression* expression) {
+int get_value(Expression* expression) {
     Val* int_val = dynamic_cast<Val*>(expression);
     if (int_val != nullptr) {
         return int_val->val;
@@ -301,7 +275,7 @@ int main() {
     input.close();
     ofstream output("output.txt");
     try  {
-        output << exp->eval(&env);
+        output << "(val " << get_value(exp->eval(&env)) << ")" << endl;
     }
     catch (...) {
         output << "ERROR";
