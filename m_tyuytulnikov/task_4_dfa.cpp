@@ -5,15 +5,15 @@
 #include <algorithm>
 #include <fstream>
 #include <queue>
+#include <cassert>
+#include <memory>
 
-#define set_of_unsigned set<unsigned>
+using set_of_unsigned = std::set<unsigned>;
 using namespace std;
 
 vector<size_t> appendUnique(vector<size_t> left, vector<size_t> right) {
-    left.insert(left.end(), right.begin(), right.end());
-    set<size_t> tmp(left.begin(), left.end());
     vector<size_t> result;
-    result.assign(tmp.begin(), tmp.end());
+    set_union(left.begin(), left.end(), right.begin(), right.end(), back_inserter(result));
     return result;
 }
 
@@ -47,7 +47,7 @@ set_of_unsigned initializeSet(unsigned el) {
 class DFA {
 private:
     map<set_of_unsigned, map<char, set_of_unsigned>> automaton;
-    set<set_of_unsigned > final_states;
+    set<set_of_unsigned> final_states;
     unsigned start_state = 0;
     size_t num_of_states = 0;
     set<char> letters;
@@ -61,18 +61,19 @@ private:
 
         virtual vector<size_t> lastPos() = 0;
 
-        virtual void calculateFollowers(vector<vector<size_t>> &followers) {};
+        virtual void calculateFollowers(vector<vector<size_t>> &followers) = 0;
 
+        virtual ~State() = default;
     };
 
     class DotState : public State {
     private:
-        State *stateLeft;
-        State *stateRight;
+        unique_ptr<State> stateLeft;
+        unique_ptr<State> stateRight;
     public:
-        DotState(State *stateLeft, State *stateRight) {
-            this->stateLeft = stateLeft;
-            this->stateRight = stateRight;
+        DotState(unique_ptr<State> stateLeft, unique_ptr<State> stateRight) {
+            this->stateLeft = move(stateLeft);
+            this->stateRight = move(stateRight);
         }
 
         bool isNullable() override {
@@ -100,24 +101,25 @@ private:
 
         }
 
-        ~DotState() {
-            delete stateLeft;
-            delete stateRight;
+        ~DotState() override {
+            stateLeft.reset();
+            stateRight.reset();
         }
 
     };
 
     class NodeState : public State {
         size_t position;
-        char character;
     public:
-        NodeState(size_t position, char character) {
+        explicit NodeState(size_t position) {
             this->position = position;
-            this->character = character;
         }
 
         bool isNullable() override {
             return false;
+        }
+
+        void calculateFollowers(vector<vector<size_t>> &followersMatrix) override {
         }
 
         vector<size_t> firstPos() override {
@@ -130,13 +132,12 @@ private:
     };
 
     class OrState : public State {
-
-        State *stateLeft;
-        State *stateRight;
+        unique_ptr<State> stateLeft;
+        unique_ptr<State> stateRight;
     public:
-        OrState(State *stateLeft, State *stateRight) {
-            this->stateLeft = stateLeft;
-            this->stateRight = stateRight;
+        OrState(unique_ptr<State> stateLeft, unique_ptr<State> stateRight) {
+            this->stateLeft = move(stateLeft);
+            this->stateRight = move(stateRight);
         }
 
         bool isNullable() override {
@@ -154,21 +155,20 @@ private:
         void calculateFollowers(vector<vector<size_t>> &followersMatrix) override {
             stateLeft->calculateFollowers(followersMatrix);
             stateRight->calculateFollowers(followersMatrix);
-
         }
 
-        ~OrState() {
-            delete stateLeft;
-            delete stateRight;
+        ~OrState() override {
+            stateLeft.reset();
+            stateRight.reset();
         }
 
     };
 
     class StarState : public State {
-        State *state;
+        unique_ptr<State> state;
     public:
-        explicit StarState(State *state) {
-            this->state = state;
+        explicit StarState(unique_ptr<State> state) {
+            this->state = move(state);
         }
 
         bool isNullable() override {
@@ -192,46 +192,58 @@ private:
             }
         }
 
-        ~StarState() {
-            delete state;
+        ~StarState() override {
+            state.reset();
         }
     };
 
-    State *convertRegexToTree(const string &regex) {
-        vector<State *> states;
+    unique_ptr<State> convertRegexToTree(const string &regex) {
+        vector<unique_ptr<State>> states;
         for (char character : regex) {
             TypeOfCharacter type = returnCharState(character);
+
             switch (type) {
                 case chara: {
-                    auto *state = new NodeState(letter_of_position.size(), character);
+                    auto state = unique_ptr<State>(new NodeState(letter_of_position.size()));
                     letters.insert(character);
                     letter_of_position.push_back(character);
-                    states.push_back(state);
+                    states.push_back(move(state));
                     break;
                 }
                 case star: {
-                    State *lastState = states[states.size() - 1];
+                    assert(!states.empty());
+                    auto lastState = move(states[states.size() - 1]);
                     states.pop_back();
-                    auto *newState = new StarState(lastState);
-                    states.push_back(newState);
+                    auto newState = unique_ptr<State>(new StarState(move(lastState)));
+                    states.push_back(move(newState));
                     break;
                 }
                 case dot: {
-                    State *leftState = states[states.size() - 2];
-                    State *rightState = states[states.size() - 1];
+                    assert(!states.empty());
+                    auto rightState = move(states[states.size() - 1]);
+
+                    unique_ptr<State> leftState = nullptr;
+                    if (states.size() > 1) {
+                        leftState = move(states[states.size() - 2]);
+                    }
                     states.pop_back();
                     states.pop_back();
-                    auto *newState = new DotState(leftState, rightState);
-                    states.push_back(newState);
+                    auto newState = unique_ptr<State>(new DotState(move(leftState), move(rightState)));
+                    states.push_back(move(newState));
                     break;
                 }
                 case bar: {
-                    State *leftState = states[states.size() - 2];
-                    State *rightState = states[states.size() - 1];
+                    assert(!states.empty());
+                    auto rightState = move(states[states.size() - 1]);
+
+                    unique_ptr<State> leftState = nullptr;
+                    if (states.size() > 1) {
+                        leftState = move(states[states.size() - 2]);
+                    }
                     states.pop_back();
                     states.pop_back();
-                    auto *newState = new OrState(leftState, rightState);
-                    states.push_back(newState);
+                    auto newState = unique_ptr<State>(new OrState(move(leftState), move(rightState)));
+                    states.push_back(move(newState));
                     break;
                 }
                 case paranthesisLeft:
@@ -239,12 +251,13 @@ private:
                 case paranthesisRight:
                     break;
             }
-
         }
-        return states[0];
+        assert(!states.empty());
+
+        return move(states[0]);
     }
 
-    size_t findRightParanthesis(string characters, size_t offset) {
+    static size_t findRightParanthesis(string characters, size_t offset) {
         size_t leftParanthesisFound = 0;
         for (size_t i = offset; i < characters.size(); i++) {
             if (characters[i] == '(') {
@@ -259,7 +272,7 @@ private:
         return characters.size() - 1;
     }
 
-    string convertRegexToPolishForm(string regex) {
+    static string convertRegexToPolishForm(const string &regex) {
         string polish;
         for (size_t i = 0; i < regex.size(); i++) {
             char character = regex[i];
@@ -270,8 +283,7 @@ private:
                     break;
                 }
                 case chara: {
-                    string str;
-                    str += character;
+                    string str ={character};
                     if (!polish.empty()) {
                         str += ".";
                     }
@@ -324,17 +336,12 @@ public:
         for (auto it : automaton) {
             it.second.clear();
         }
-        automaton.clear();
-        final_states.clear();
-        letters.clear();
-        letter_of_position.clear();
     }
 
-    explicit DFA(string &regex) :
+    explicit DFA(const string &regex) :
             start_state(0) {
-        State *state;
-        string polish = convertRegexToPolishForm(std::move(regex));
-        state = convertRegexToTree(polish);
+        string polish = convertRegexToPolishForm(regex);
+        auto state = convertRegexToTree(polish);
         letters.erase('#');
 
         vector<vector<size_t>> vec(letter_of_position.size(), vector<size_t>());
@@ -367,7 +374,7 @@ public:
                 if (statesToState.find(nextState) == statesToState.end()) {
                     statesToState.insert(pair<set<size_t>, size_t>(nextState, currentState));
                     automaton[initializeSet(position)].insert(
-                            pair<char, set_of_unsigned >(c, initializeSet(currentState)));
+                            pair<char, set_of_unsigned>(c, initializeSet(currentState)));
                     currentState++;
                     currentStates.push(nextState);
                 } else {
@@ -401,7 +408,7 @@ public:
             m.automaton[initializeSet(from)][chr].insert(to);
         }
 
-        queue<set_of_unsigned > q;
+        queue<set_of_unsigned> q;
         q.push(initializeSet(m.start_state));
         while (!q.empty()) {
             auto top = q.front();
@@ -459,10 +466,11 @@ int main() {
             fout << "NO" << endl;
     }
 
-//    string regex = "abc(b|c)#";
+//    string regex = "abc(d|e)";
 //    regex += "#";   // char # in the end is required by algorithm
-//    DFA a (regex);
-//    string s = "abcb";
+//    DFA a(regex);
+//    string s = "abcd";
 //    cout << a.check(s);
+
     return 0;
 }
