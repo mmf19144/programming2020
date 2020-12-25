@@ -11,15 +11,16 @@
 
 using namespace std;
 
-
+//#define DEBUG
 string ROOT_DIR = "test_data";
+static regex regexp("<a[^>]* href=\"([^<]+)\"[^>]*>");
 
 template<class Uniq>
 class IJob {
 public:
     virtual ~IJob() = default;
 
-    virtual Uniq &getUniq() = 0;
+    virtual const Uniq &getUniq() = 0;
 
     virtual void Execute() = 0;
 };
@@ -35,17 +36,6 @@ public:
             addedJobs++;
             cond.notify_one();
         }
-    }
-
-    std::unique_ptr<T> TryPop() {
-        std::unique_lock<std::mutex> guard(lock);
-        if (stop || queue.empty()) {
-            return nullptr;
-        }
-
-        auto job = std::move(queue.front());
-        queue.pop();
-        return std::move(job);
     }
 
     std::unique_ptr<T> Pop() {
@@ -105,6 +95,7 @@ private:
             throw invalid_argument("Protocol is not available");
         }
 
+
         string protocol = href.substr(0, finding);
         string path = href.substr(finding + delimiter.length(), href.length());
         if (protocol == "file") {
@@ -128,7 +119,7 @@ public:
 Queue<UrlJob, string> q;
 
 void UrlJob::Execute() {
-
+    smatch result;
 #ifdef DEBUG
     cout << href << endl;
 #endif
@@ -136,15 +127,14 @@ void UrlJob::Execute() {
         return;
 
     string body = getBodyByHref();
-
-    for (size_t i = 0; i < body.size(); i++) {
-        if (body[i] == '<' && i + 10 < body.size()) {
-            string token = body.substr(i + 1, body.find('<', i + 1) - 1);
-            if (token.length() > 0 && token[0] == 'a' && token.substr(2, 6) == "href=\"") {
-                token = token.substr(8, token.find('>', 8) - 9);
-                q.Push(std::make_unique<UrlJob>(token));
-            }
+    while (regex_search(body, result, regexp)) {
+        string newHref = result.str(1);
+        if (newHref.empty()) {
+            body = result.suffix().str();
+            continue;
         }
+        q.Push(std::make_unique<UrlJob>(newHref));
+        body = result.suffix().str();
     }
 
 }
