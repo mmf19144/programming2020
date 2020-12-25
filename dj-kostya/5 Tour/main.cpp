@@ -8,6 +8,9 @@
 #include <chrono>
 #include <utility>
 #include <unordered_set>
+#include <condition_variable>
+
+#include <re2/re2.h>
 
 using namespace std;
 
@@ -119,7 +122,6 @@ public:
 Queue<UrlJob, string> q;
 
 void UrlJob::Execute() {
-    smatch result;
 #ifdef DEBUG
     cout << href << endl;
 #endif
@@ -127,16 +129,14 @@ void UrlJob::Execute() {
         return;
 
     string body = getBodyByHref();
-    while (regex_search(body, result, regexp)) {
-        string newHref = result.str(1);
+    re2::StringPiece input(body);
+    std::string newHref;
+    while (re2::RE2::FindAndConsume(&input, "<a[^>]* href=\"([^<]+)\"[^>]*>", &newHref)) {
         if (newHref.empty()) {
-            body = result.suffix().str();
             continue;
         }
         q.Push(std::make_unique<UrlJob>(newHref));
-        body = result.suffix().str();
     }
-
 }
 
 void threadFunc() {
