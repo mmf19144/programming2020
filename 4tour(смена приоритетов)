@@ -1,0 +1,200 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <string.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <map>
+using namespace std;
+
+map <char, int> op_preced0;
+map <char, char> op_assoc0;
+
+
+int result(int num1, int num2, char operand) {
+	switch (operand) {
+	case'+':return (num1 + num2);
+	case'-':return (num1 - num2);
+	case'*':return (num1 * num2);
+	case'/':
+		if (num2 == 0)
+			throw std::invalid_argument("0");
+		else
+			return (num1 / num2);
+	}
+	return 0;
+}
+
+int op_preced(const char c)// Приоритет
+{
+	switch (c){
+	case '*': return op_preced0.find('*')->second;
+	case '/': return op_preced0.find('/')->second;
+	case '+': return op_preced0.find('+')->second;
+	case '-': return op_preced0.find('-')->second;
+	}
+}
+
+bool op_assoc(const char c)//Ассоциативность
+{
+	char l;
+	switch (c){
+	// лево-ассоциативные
+	case '*': l = op_assoc0.find('*')->second;
+	case '/': l = op_assoc0.find('/')->second;
+	case '+': l = op_assoc0.find('+')->second;
+	case '-': l = op_assoc0.find('-')->second;
+	}
+	if (l=='L')
+		return true;
+	else
+		return false;
+}
+
+unsigned int op_arg_count(const char c)
+{
+	switch (c)
+	{
+	case '*':
+	case '/':
+	case '+':
+	case '-':
+		return 2;
+	}
+	return 0;
+}
+
+#define is_operator(c) (c == '+' || c == '-' || c == '/' || c == '*' )
+#define is_ident(c) (c >= '0' && c <= '9')
+
+bool shunting_yard(char* output, char* input){
+	const char* strpos = input, *strend = strpos + strlen(strpos);
+	char c, stack[32], sc, * outpos = output;
+	unsigned int sl = 0;
+	while (strpos < strend){
+		c = *strpos;
+		if (c != ' '){
+			if (is_ident(c)){
+				*outpos = c; ++outpos;
+			}
+			else if (is_operator(c)){
+				while (sl > 0){
+					sc = stack[sl - 1];
+					if (is_operator(sc) &&
+						((op_assoc(c) && (op_preced(c) <= op_preced(sc))) ||
+						(!op_assoc(c) && (op_preced(c) < op_preced(sc))))){
+						*outpos = sc; ++outpos;
+						sl--;
+					}
+					else{
+						break;
+					}
+				}
+				stack[sl] = c;
+				++sl;
+			}
+			else if (c == '('){
+				stack[sl] = c;
+				++sl;
+			}
+			else if (c == ')'){
+				bool pe = false;
+				while (sl > 0){
+					sc = stack[sl - 1];
+					if (sc == '('){
+						pe = true;
+						break;
+					}
+					else{
+						*outpos = sc; ++outpos;
+						sl--;
+					}
+				}
+				if (!pe){
+					cout << "Error: parentheses mismatched";
+					return false;
+				}
+				sl--;
+			}
+			else{
+				cout << "Unknown token";
+				return false; // Unknown token
+			}
+		}
+		++strpos;
+	}
+	while (sl > 0){
+		sc = stack[sl - 1];
+		if (sc == '(' || sc == ')'){
+			cout << "Error: parentheses mismatched";
+			return false;
+		}
+		*outpos = sc; ++outpos;
+		--sl;
+	}
+	*outpos = 0;
+	return true;
+}
+
+bool execution_order(char* input){
+	char c;
+	int ind = 0, stack[32] = {0}, num, num1, num2, res_num, i = 0;
+	int len = strlen(input);
+	while (i<len){
+		c = input[i];
+		if (is_ident(c)){
+			stack[ind] = c - '0';
+			++ind;
+		}
+		else if (is_operator(c)){
+			unsigned int nargs = op_arg_count(c);
+			unsigned int Tnargs = nargs;
+			if (ind < nargs){
+				return false;
+			}
+			else{
+				num1 = stack[ind - 2];
+				num2 = stack[ind - 1];
+				ind -= 2;
+				num = result(num1, num2, c);
+			}
+			stack[ind] = num;
+			++ind;
+		}
+		i++;
+	}
+	if (ind == 1){
+		num = stack[ind - 1];
+		ind--;
+		cout << num;
+		return true;
+	}
+	return false;
+}
+
+int main(){
+	std::ofstream cout("output.txt");
+	auto& fout = cout;
+	std::ifstream fin("input.txt");
+	char input[128];
+	char output[128];
+	char op; int p; char a;
+	for (int j = 0; j < 4; j++) {
+		fin >> op >> p >> a;
+		op_preced0.emplace(op, p);
+		op_assoc0.emplace(op, a);
+	}
+	fin.getline(input, 128);
+	fin.getline(input, 128);
+	if (shunting_yard(output, input)){
+		//cout << "output " << output;
+		try {
+			execution_order(output);
+		}
+		catch(invalid_argument){
+			cout << "ERROR" << "\n";
+		}
+	}
+	return 0;
+}
