@@ -44,7 +44,6 @@ private:
         while (getline(fin, file_line)) {
             smatch tag_match;
             fout << file_line << endl;
-            string_view str(file_line);
             while (regex_search(file_line, tag_match, find_pattern)) {
                 found_parsing_files.push_back(tag_match.str(1));
                 file_line = move(tag_match.suffix().str());
