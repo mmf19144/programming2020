@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <cstring>
 
 using namespace std;
 
@@ -39,7 +40,7 @@ private:
     int size;
     int* arr;
 public:
-    Matrix(): size(0), arr(NULL) {}
+    Matrix() : size(0), arr(NULL) {}
 
     Matrix(int A) {
         size = A;
@@ -160,7 +161,9 @@ public:
         return in;
     }
 
-
+    ~Matrix() {
+        delete[] arr;
+    }
 };
 
 int main() {
@@ -176,8 +179,6 @@ int main() {
     fin >> A >> B >> C >> D;
 
     fout << (A + B * (~C) + K) * (~D);
-
-    //fout << A(2, 1);
 
     return 0;
 }
