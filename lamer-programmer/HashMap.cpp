@@ -1,258 +1,221 @@
-#include <fstream>
-#include <set>
 #include <iostream>
+#include <functional>
+#include <fstream>
 
-size_t start_size = 4;
-
-template <typename K, typename V>
+// почти полностью переписал реализацию
+template<typename K, typename V>
 class HashMap
 {
-    std::pair<K, V> ** arr;
-    size_t capacity;
-    size_t max_size;
-    double k;
+	std::pair<K, V> ** arr;
+	size_t current_size;
+	size_t capacity;
+	double percentage_of_occupancy;
 
-    void restructuring()
+	void restructuring()
 	{
-		HashMap temp{ max_size * 2, k };
+		size_t temp_capacity;
+		if (capacity == 0)
+		{
+			temp_capacity = 1;
+		}
+		else
+		{
+			temp_capacity = capacity * 2;
+		}
+		HashMap<K, V> temp{percentage_of_occupancy, temp_capacity};
+		for (const auto & element : *this)
+		{
+			temp.insert(element.first, element.second);
+		}
+		*this = temp;
+	}
 
-		for (size_t i = 0; i < max_size; i++)
+	size_t get_index(const K & key) const
+	{
+		std::hash<K> h;
+		return h(key) % capacity;
+	}
+
+	size_t next_index(size_t index) const
+	{
+		index++;
+		if (index == capacity)
 		{
-			if (arr[i] != nullptr)
-			{
-				temp.insert(*(arr[i]));
-			}
+			index = 0;
 		}
-		
-		for (size_t i = 0; i < max_size; i++)
-		{
-			if (arr[i] != nullptr)
-			{
-				delete arr[i];
-			}
-		}
-		delete[] arr;
-		arr = temp.arr;
-		temp.arr = nullptr;
-		temp.max_size = 0;
-		max_size *= 2;
+		return index;
 	}
 
 public:
-
-	size_t size1()
+	explicit HashMap(double percentage_of_occupancy)
+			: percentage_of_occupancy{percentage_of_occupancy}
+			, capacity{2}
+			, current_size{0}
 	{
-		return max_size;
-	}
-
-    HashMap(double k) : arr{new std::pair<K, V> * [start_size]}, capacity{0}, max_size{start_size}, k{k}
-    {   
-		for (size_t i = 0; i < max_size; i++)
+		arr = new std::pair<K, V> * [capacity];
+		for (size_t i = 0; i < capacity; i++)
 		{
 			arr[i] = nullptr;
 		}
 	}
 
-    HashMap(size_t max_size, double k) : arr{new std::pair<K, V> * [max_size]}, capacity{0}, max_size{max_size}, k{k}
-    {   
-		for (size_t i = 0; i < max_size; i++)
+	HashMap(double percentage_of_occupancy, size_t start_size)
+			: percentage_of_occupancy{percentage_of_occupancy}
+			, capacity{start_size}
+			, current_size{0}
+	{
+		arr = new std::pair<K, V> * [capacity];
+		for (size_t i = 0; i < capacity; i++)
 		{
 			arr[i] = nullptr;
 		}
 	}
 
-    HashMap(const HashMap<K, V> & other)
-    {
-        for (size_t i = 0; i < max_size; i++)
-        {
-            delete arr[i];
-        }
-        delete[] arr;
-        arr = nullptr;
-        arr = new std::pair<K, V> * [other.max_size];
-        max_size = other.max_size;
-        capacity = other.capacity;
+	HashMap(const HashMap<K, V> & other)
+			: percentage_of_occupancy{other.percentage_of_occupancy}
+	{
+		current_size = other.current_size;
+		capacity = other.capacity;
+		arr = new std::pair<K, V> * [capacity];
+		for (size_t i = 0; i < capacity; i++)
+		{
+			if (other.arr[i] == nullptr)
+			{
+				arr[i] = nullptr;
+			} else
+			{
+				arr[i] = new std::pair<K, V>{*(other.arr[i])};
+			}
+		}
+	}
 
-        for (size_t i = 0; i < max_size; i++)
-        {
-            if (other.arr[i] != nullptr)
-            {
-                arr[i] = new std::pair<K, V>(other.arr[i][0]);
-            }
-            else
-            {
-                arr[i] = nullptr;
-            }
-        }
-    }
+	~HashMap()
+	{
+		for (size_t i = 0; i < capacity; i++)
+		{
+			delete arr[i];
+		}
+		delete[] arr;
+	}
 
-    ~HashMap()
-    {
-        for (size_t i = 0; i < max_size; i++)
-        {
-            delete arr[i];
-        }
-        delete[] arr;
-    }
+	HashMap<K, V> & operator=(const HashMap<K, V> & other)
+	{
+		if (this == &other)
+		{
+			return *this;
+		}
+		percentage_of_occupancy = other.percentage_of_occupancy;
+		for (size_t i = 0; i < capacity; i++)
+		{
+			delete arr[i];
+		}
+		delete[] arr;
+		arr = nullptr;
 
-    size_t size() const
-    {
-        return capacity;
-    }
+		current_size = other.current_size;
+		capacity = other.capacity;
+		arr = new std::pair<K, V> * [other.capacity];
+		for (size_t i = 0; i < capacity; i++)
+		{
+			if (other.arr[i] == nullptr)
+			{
+				arr[i] = nullptr;
+			} else
+			{
+				arr[i] = new std::pair<K, V>{*(other.arr[i])};
+			}
+		}
+		return *this;
+	}
 
-    class iterator
-    {
+	class iterator
+	{
 		friend class HashMap;
 
-        std::pair<K, V> ** arr;
-		size_t max_size;
+		std::pair<K, V> ** arr;
+		size_t capacity;
 		size_t index;
 
-    public:
-        iterator(std::pair<K, V> ** arr, size_t max_size, size_t index = 0)
-				 : arr{arr}
-				 , max_size{max_size}
-				 , index{index}
-		{	}
+	public:
+		iterator()
+				: arr{nullptr}
+				, capacity{0}
+				, index{0}
+		{   }
+
+		iterator(std::pair<K, V> ** arr, size_t capacity, size_t index)
+				: arr{arr}
+				, capacity{capacity}
+				, index{index}
+		{   }
 
 		iterator(const iterator & other)
-				 : arr{other.arr}
-				 , max_size{other.max_size}
-				 , index{other.index}
-		{	}
+				: arr{other.arr}
+				, capacity{other.capacity}
+				, index{other.index}
+		{   }
 
-		iterator operator++(int)
+		std::pair<K, V> & operator*() const
 		{
-			iterator temp{*this};
-			do
+			if (index == capacity)
 			{
-				index++;
-				if (index == max_size)
-				{
-					index = 0;
-				}
-			} while (arr[index] == nullptr);
-			return temp;
+				throw std::out_of_range{"Разыменование итератора end()"};
+			}
+			return *(arr[index]);
 		}
-	
+
 		iterator & operator++()
 		{
 			do
 			{
+				if (index == capacity)
+				{
+					throw std::out_of_range{"HashMap::iterator::operator++() - выход за пределы таблицы"};
+				}
 				index++;
-				if (index == max_size)
-				{
-					index = 0;
-				}
 			} while (arr[index] == nullptr);
 			return *this;
 		}
 
-		iterator operator--(int)
+		const iterator operator++(int)
 		{
-			iterator temp{ *this };
+			iterator temp{*this};
 			do
 			{
-				index--;
-				if (index == -1)
+				if (index == capacity)
 				{
-					index = max_size - 1;
+					throw std::out_of_range{"HashMap::iterator::operator++(int) - выход за пределы таблицы"};
 				}
+				index++;
 			} while (arr[index] == nullptr);
 			return temp;
 		}
 
-		iterator operator--()
+		iterator & operator=(const iterator & other)
 		{
-			do
+			if (this == &other)
 			{
-				index--;
-				if (index == -1)
-				{
-					index = max_size - 1;
-				}
-			} while (arr[index] == nullptr);
-			return *this;
-		}
-
-		iterator & operator+=(int num)
-		{
-			if (num >= 0)
-			{
-				for (size_t i = 0; i < num; i++)
-				{
-					(*this)++;
-				}
+				return *this;
 			}
-			else
-			{
-				for (size_t i = 0; i < -1 * num; i++)
-				{
-					(*this)--;
-				}
-			}
-			return *this;
+			arr = other.arr;
+			capacity = other.capacity;
+			index = other.index;
 		}
 
-		iterator & operator-=(int num)
+		bool operator==(const iterator & other) const
 		{
-			(*this) += -1 * num;
-			return *this;
+			return index == other.index && arr == other.arr;
 		}
 
-		iterator operator+(int num) const
+		bool operator!=(const iterator & other) const
 		{
-			iterator temp{ *this };
-			if (num >= 0)
-			{
-				for (size_t i = 0; i < num; i++)
-				{
-					temp++;
-				}
-			}
-			else
-			{
-				for (size_t i = 0; i < -1 * num; i++)
-				{
-					temp--;
-				}
-			}
-			return temp;
-		}
-
-		iterator operator-(int num) const
-		{
-			return *this + -num;
-		}
-
-		bool operator!=(const iterator other) const
-		{
-			return index != other.index;
-		}
-
-		bool operator==(const iterator other) const
-		{
-			return index == other.index;
-		}
-
-		std::pair<K, V> & operator*() const
-		{
-			return *(arr[index]);
-		}
-
-		std::pair<K, V> * operator->() const
-		{
-			return arr[index];
+			return index != other.index || arr != other.arr;
 		}
 	};
 
-	iterator begin()
+	iterator begin() const
 	{
-		if (capacity == 0)
-		{
-			throw std::logic_error{"Нет элементов - нет начала."};
-		}
-		iterator temp{arr, max_size};
+		HashMap::iterator temp{arr, capacity, 0};
 		if (arr[0] == nullptr)
 		{
 			temp++;
@@ -260,165 +223,164 @@ public:
 		return temp;
 	}
 
-	iterator insert(std::pair<K, V> element)
+	iterator end() const
 	{
-		if (double(capacity) / max_size > k)
-		{
-			restructuring();
-		}
-
-		std::hash<K> h;
-		size_t index = h(element.first) % max_size;
-
-		while (arr[index] != nullptr)
-		{
-			if ((*arr[index]).first == element.first)
-			{
-				*arr[index] = element;
-				return iterator{arr, max_size, index};
-			}
-
-			index++;
-			if (index == max_size)
-			{
-				index = 0;
-			}
-		}
-		arr[index] = new std::pair<K, V>{element};
-		capacity++;
-		return iterator{arr, max_size, index};
+		return HashMap::iterator{arr, capacity, capacity};
 	}
 
 	iterator find(const K & key) const
 	{
-		std::hash<K> h;
-		size_t index = h(key) % max_size;
-		size_t temp = index;
-		if (arr[index] == nullptr)
+		size_t index = get_index(key);
+		size_t start_index = index;
+		while (true)
 		{
-			throw std::out_of_range{"Элемент не найден"};
+			if (arr[index] == nullptr)
+			{
+				index = next_index(index);
+				if (start_index == index)
+				{
+					return end();
+				}
+				continue;
+			}
+			else
+			{
+				if (arr[index]->first != key)
+				{
+					if (start_index == index)
+					{
+						return end();
+					}
+					index = next_index(index);
+					continue;
+				}
+			}
+			break;
 		}
-		while ((*arr[index]).first != key)
+		return iterator(arr, capacity, index);
+	}
+
+	void insert(const K & key, const V & value)
+	{
+		if (double(current_size) / capacity >= percentage_of_occupancy || capacity == 0)
 		{
+			restructuring();
+		}
+		size_t index = get_index(key);
+		while (arr[index] != nullptr)
+		{
+			if (arr[index]->first == key)
+			{
+				arr[index]->second = value;
+				return;
+			}
 			index++;
-			if (index == max_size)
+			if (index == capacity)
 			{
 				index = 0;
 			}
-			if (temp == index)
-			{
-				throw std::out_of_range{"Элемент не найден."};
-			}
 		}
-		return iterator{arr, max_size, index};
+		arr[index] = new std::pair<K, V>{key, value};
+		current_size++;
 	}
 
 	void erase(const K & key)
 	{
-		iterator it{arr, max_size};
-		try
-		{
-			it = find(key);
-		}
-		catch(const std::exception& e)
+		iterator it = find(key);
+
+		if (it == end())
 		{
 			return;
 		}
-		
+
 		delete arr[it.index];
 		arr[it.index] = nullptr;
-		capacity--;
+		current_size--;
+	}
+
+	size_t size() const
+	{
+		return current_size;
 	}
 };
 
-
-template <typename K, typename V>
-void execution(std::istream & in, std::ostream & out)
+template<typename K, typename V>
+size_t get_unique_count(HashMap<K, V> & hash_table)
 {
-	HashMap<K, V> hash_map{ 0.8 };
+	HashMap<V, int> temp{0.8};
+	for (const auto & p : hash_table)
+	{
+		temp.insert(p.second, 0);
+	}
+	return temp.size();
+}
+
+template<typename K, typename V>
+void foo2(std::ifstream & fin, std::ofstream & fout)
+{
+	HashMap<K, V> hash_map{0.8};
 	size_t count_commands;
-	in >> count_commands;
+	fin >> count_commands;
+
 	for (size_t i = 0; i < count_commands; i++)
 	{
 		char command;
-		in >> command;
 		K key;
+		fin >> command;
 		if (command == 'A')
 		{
 			V value;
-			in >> key >> value;
-			hash_map.insert({key, value});
+			fin >> key >> value;
+			hash_map.insert(key, value);
 		}
 		if (command == 'R')
 		{
-			in >> key;
+			fin >> key;
 			hash_map.erase(key);
 		}
 	}
+	fout << hash_map.size() << " ";
+	fout << get_unique_count<K, V>(hash_map) << std::endl;
+}
 
-	std::set<V> set_1;
-	if (hash_map.size() != 0)
+template<typename K>
+void foo1(std::ifstream & fin, std::ofstream & fout)
+{
+	char type_value;
+	fin >> type_value;
+
+	if (type_value == 'I')
 	{
-		auto it1 = hash_map.begin();
-		for (size_t i = 0; i < hash_map.size(); i++, it1++)
-		{
-			set_1.insert((*it1).second);
-		}
+		foo2<K, int>(fin, fout);
 	}
-
-	out << hash_map.size() << " " << set_1.size();
+	if (type_value == 'D')
+	{
+		foo2<K, double>(fin, fout);
+	}
+	if (type_value == 'S')
+	{
+		foo2<K, std::string>(fin, fout);
+	}
 }
 
 int main()
 {
-	std::ifstream fin{ "input.txt" };
-	std::ofstream fout{ "output.txt" };
-	
-	char type_key, type_value;
-	fin >> type_key >> type_value;
+	std::ifstream fin{"input.txt"};
+	std::ofstream fout{"output.txt"};
 
-	if (type_key == 'I' && type_value == 'I')
+	char type_key;
+	fin >> type_key;
+
+	if (type_key == 'I')
 	{
-		execution<int, int>(fin, fout);
+		foo1<int>(fin, fout);
 	}
-
-	if (type_key == 'I' && type_value == 'D')
+	if (type_key == 'D')
 	{
-		execution<int, double>(fin, fout);
+		foo1<double>(fin, fout);
 	}
-
-	if (type_key == 'I' && type_value == 'S')
+	if (type_key == 'S')
 	{
-		execution<int, std::string>(fin, fout);
-	}
-
-	if (type_key == 'D' && type_value == 'I')
-	{
-		execution<double, int>(fin, fout);
-	}
-
-	if (type_key == 'D' && type_value == 'D')
-	{
-		execution<double, double>(fin, fout);
-	}
-
-	if (type_key == 'D' && type_value == 'S')
-	{
-		execution<double, std::string>(fin, fout);
-	}
-
-	if (type_key == 'S' && type_value == 'I')
-	{
-		execution<std::string, int>(fin, fout);
-	}
-
-	if (type_key == 'S' && type_value == 'D')
-	{
-		execution<std::string, double>(fin, fout);
-	}
-
-	if (type_key == 'S' && type_value == 'S')
-	{
-		execution<std::string, std::string>(fin, fout);
+		foo1<std::string>(fin, fout);
 	}
 }
