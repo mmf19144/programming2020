@@ -6,11 +6,15 @@
 #include <thread>
 #include <mutex>
 #include <unordered_map>
+#include <condition_variable>
+#include <future>
 
 using namespace std;
 
+
 class Crawler
 {
+
 	const regex reg_modify{ "<a href=\"([^\"]*)\">" };
 	const size_t max_threads;
 
@@ -18,9 +22,9 @@ class Crawler
 	unordered_map<string, string> viewed_files;
 	chrono::milliseconds timing{};
 
-	vector<thread> threads;
-	int work_threads = 0;
 	mutex mut;
+	condition_variable cond_var;
+	int work_threads = 0;
 
 	pair<string, string> split(string str, string delimiter = "//")
 	{
@@ -39,58 +43,68 @@ class Crawler
 			std::smatch m = *i;
 			pairs.push_back(m[1].str());
 		}
-		
+
 		return pairs;
 	}
 
-	void parsing()
+	void parsing(string address)
 	{
-		mut.lock();
-		if (current_files.empty())
+		pair<string, string> pr = split(address);
+		
+		if (pr.first == "file://")
 		{
-			mut.unlock();
-			return;
-		}
-		work_threads++;
-		string address = (*current_files.begin()).second;
-
-		current_files.erase(current_files.begin());
-		viewed_files.insert({ address, address });
-		mut.unlock();
-
-		auto [protocol, path] = split(address);
-		if (protocol == "file://")
-		{
-			ifstream fin{ path };
+			ifstream fin{ pr.second };
 			string data;
 			getline(fin, data, (char)fin.eof());
 
 			auto links = get_links(data);
 			for (const auto & l : links)
 			{
-				mut.lock();
+				unique_lock<mutex> lock{ mut };
 				if (viewed_files.find(l) == viewed_files.end())
 				{
 					current_files.insert({ l, l });
+					cond_var.notify_one();
 				}
-				mut.unlock();
 			}
 		}
-		mut.lock();
 		work_threads--;
-		mut.unlock();
+		if (work_threads <= 0 && current_files.empty())
+		{
+			cond_var.notify_all();
+		}
 	}
-
+	
 	void start_parse()
 	{
-		mut.lock();
-		while (!current_files.empty() || work_threads != 0)
 		{
-			mut.unlock();
-			parsing();
-			mut.lock();
+			std::unique_lock<std::mutex> lk(mut);
+			cout << "Thread enter: id: " << std::this_thread::get_id() << "\r\n";
 		}
-		mut.unlock();
+		do
+		{
+			string address;
+			{
+				std::unique_lock<std::mutex> lk(mut);
+				if (current_files.empty() && work_threads > 0)
+				{
+					cond_var.wait(lk);
+				}
+				if (current_files.empty()) { break; }
+				address = (*current_files.begin()).second;
+
+				current_files.erase(current_files.begin());
+				viewed_files.insert({ address, address });
+				bFilesInQueue = !current_files.empty();
+				work_threads++;
+			}
+			parsing(address);
+		} while (true);
+
+		{
+			std::unique_lock<std::mutex> lk(mut);
+			cout << "Thread exit: id: " << std::this_thread::get_id() << "\r\n";
+		}
 	}
 
 public:
@@ -99,18 +113,20 @@ public:
 
 	void run(string address)
 	{
+		vector<future<void>> threads;
+
 		auto start = chrono::high_resolution_clock::now();
 		auto [protocol, path] = split(address);
 		current_files.insert({ address, address });
 
 		for (size_t i = 0; i < max_threads; i++)
 		{
-			threads.push_back(thread([&]() { start_parse(); }));
+			threads.push_back(async(launch::async, [&]() { start_parse(); }));
 		}
 
-		for (auto& t : threads)
+		for (auto & t : threads)
 		{
-			t.join();
+			t.wait();
 		}
 		timing = chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - start);
 	}
@@ -126,9 +142,9 @@ int main()
 	string address = "file://0.html";
 	cin >> address;
 
-	Crawler crawler{8};
+	Crawler crawler{ 8 };
 	crawler.run(address);
 	auto [time2, count2] = crawler.get_statistics();
-	cout << "Crawler 6 threads. Time - " << time2.count() << "ms, count pages - " << count2 << endl;
-	
+	cout << "Crawler 8 threads. Time - " << time2.count() << "ms, count pages - " << count2 << endl;
+
 }
