@@ -168,11 +168,12 @@ public:
 		{
 			do
 			{
+				index++;
 				if (index == capacity)
 				{
 					throw std::out_of_range{"HashMap::iterator::operator++() - выход за пределы таблицы"};
 				}
-				index++;
+				
 			} while (arr[index] == nullptr);
 			return *this;
 		}
