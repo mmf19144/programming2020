@@ -13,8 +13,7 @@ using namespace std;
 
 const string PATH = "test_data/";
 mutex locker;
-map<string, bool> completed_files;
-queue<string> file_queue;
+
 vector<bool> threadStatus;
 
 bool threadsWorking() {
@@ -34,7 +33,7 @@ static string getFileName(const string &input) {
     return res.str();
 }
 
-void run(int thread_id) {
+void run(int thread_id, map<string, bool> &completed_files, queue<string> &file_queue) {
     const regex rx("<a[^>]* href=\"([^<]+)\"[^>]*>");
 
     while (threadsWorking()) {
@@ -72,6 +71,8 @@ void run(int thread_id) {
 class Crawler {
     const size_t num_of_threads;
     vector<thread> threads;
+    map<string, bool> completed_files;
+    queue<string> file_queue;
 public:
     Crawler(const string &start_file, size_t num_of_threads) :
             num_of_threads(num_of_threads) {
@@ -82,7 +83,7 @@ public:
         threadStatus.resize(num_of_threads);
 
         for (size_t i = 0; i < num_of_threads; i++) {
-            threads[i] = thread(run, i);
+            threads[i] = thread(run, i, ref(completed_files), ref(file_queue));
             threadStatus[i] = true;
         }
     }
