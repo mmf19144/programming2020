@@ -167,7 +167,7 @@ int main() {
 	fin >> A >> B >> C >> D;
 
 	matrix result = ((A + B * C.T() + K) * D.T());
-
+	delete[] diag;
 	fout << result;
 	return 0;
 }
