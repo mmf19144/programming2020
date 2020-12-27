@@ -60,9 +60,9 @@ protected:
 
 public:
     Hashmap() {
-        arr = new Node<K, N>[100];
+        arr = new Node<K, N>[10];
         this->size = 0;
-        this->cap = 100;
+        this->cap = 10;
         this->pc = 70;
     }
 
@@ -158,7 +158,7 @@ public:
     void add(size_t hsh,K key, N value) {
 
         size_t hash = this->get_hash(key);
-        for (int i = hash; i < this->cap * 1.5; i++) {
+        for (int i = hash; i < this->cap * 2; i++) {
             if (i<this->cap) {
 
                 if (arr[i].getstatus() != 1) {
@@ -217,9 +217,10 @@ public:
         int res = 0;
 
         // Pick all elements one by one
-        for (int i = 1; i < this->cap; i++) {
+        for (int i = 0; i < this->cap; i++) {
             if (arr[i].getstatus() == 1) {
                 int j = 0;
+                cout << arr[i].getval() << endl;
                 for (j = 0; j < i; j++){
                     if (arr[i].getval() == arr[j].getval())
                         break;}
@@ -233,7 +234,7 @@ public:
     }
     void printtable(){
         for(int i =0;i<this->cap;i++){
-            cout << arr[i].getstatus();
+            cout << arr[i].getstatus() << ' ' << arr[i].getval() << endl;
         }
     }
 
