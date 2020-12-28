@@ -185,11 +185,10 @@ public:
         if (table[iter].getFilled() && table[iter].getKey() == addKey) {
             table[iter].setValue(addValue);
         } else {
-            while (table[iter].getFilled() && table[iter].getKey() != addKey) {
+            while ((table[iter].getFilled() || table[iter].getDeleted()) && table[iter].getKey() != addKey) {
                 iter++;
                 iter %= size;
             }
-
             table[iter].setKey(addKey);
             table[iter].setValue(addValue);
             capacity++;
@@ -205,7 +204,7 @@ public:
 
         size_t iter = hash_value;
 
-        while (table[iter].getFilled()) {
+        while (table[iter].getFilled() || table[iter].getDeleted()) {
             if (table[iter].getFilled() && table[iter].getKey() == delKey) {
                 table[iter].deleteElement();
                 capacity--;
