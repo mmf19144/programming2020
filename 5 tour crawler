@@ -3,83 +3,62 @@
 #include <vector>
 #include <set>
 #include <queue>
-#include <iostream>
-#include <fstream>
-#include <string>
+#include <cstring>
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <regex>
 #include <atomic>
 
 using namespace std;
-
-string RepositoryDownl = "C:\\crawler\\";
-string Repositorypushl = "C:\\crawler_output\\";
+using namespace chrono;
 
 class crawler {
+private:
+    int Threads_count;
+    string RepositoryDownl = "crawler\\";
+    string RepositoryPushl = "crawler_output\\";
+    string startPath;
+    vector <thread> threads;
+    queue <string> goingtoProcessed;
+    set <string> processed;
+    mutex contLock;
+    atomic <int> TasksAllStart;
+    atomic <int> TasksEnded;
+    condition_variable checking;
+
 public:
     crawler(int count, string input) : Threads_count(count), startPath(input) {
         goingtoProcessed.push(input);
-        processed.insert(input);
     }
 
-    void ThreadAddNewFile(string href) {
-        lock_guard<mutex> lockGuard(contLock);
-        if (processed.find(href) == processed.end()) {
-            TasksAllStart++;
-            goingtoProcessed.push(href);
-        }
-    }
 
-    static void ThreadFileCopy(string filename) {
-        ifstream in(filename);
-        string outputFile = Repositorypushl + filename;
-        ofstream out(outputFile);
-        string input;
-        out << in.rdbuf();
-        in.close();
-        out.close();
-    }
-
-    void ThreadProcessFile(string file) {
-        {
-            lock_guard<mutex> lockGuard(contLock);
-            if (processed.find(file) != processed.end() && file != startPath) {
-                return;
-            }
-        }
-        ifstream in(file);
-        ThreadFileCopy(file);
+    void ThreadProcessFile(string file, regex& pattern) {
+        ifstream in(RepositoryDownl + file);
+        ofstream out(RepositoryPushl + file);
         string line;
-        char c;
         vector<string> hrefs;
 
-        while (in) {
-            line.clear();
-            c = in.get();
-            if (c == '<' && in.get() == 'a') {
-                while (c != '\"')
-                    c = in.get();
-                c = in.get();
-                while (c != '\"') {
-                    line += c;
-                    c = in.get();
-                }
-                // line = "file://...."
-                hrefs.push_back(line.substr(7));
+        while (getline(in, line)) {
+            smatch match;
+            out << line << endl;
+            while (regex_search(line, match, pattern)) {
+                hrefs.push_back(move(match.str(1)));
+                line = move(match.suffix().str());
             }
         }
-        for (auto i : hrefs)
-            ThreadAddNewFile(i);
-        ThreadFileAddDone(file);
+        in.close();
+        out.close();
+        {
+            lock_guard<mutex> lockGuard(contLock);
+            for (auto& i : hrefs)
+                goingtoProcessed.push(i);
+            processed.insert(file);
+        }
     }
 
-    void ThreadFileAddDone(string filename) {
-        lock_guard<mutex> lockGuard(contLock);
-        processed.insert(filename);
-    }
+
     pair<bool, string> ThreadGetNewFile() {
-        lock_guard<mutex> guard(contLock);
         if (!goingtoProcessed.empty()) {
             string nextFile = goingtoProcessed.front();
             goingtoProcessed.pop();
@@ -88,72 +67,54 @@ public:
         return make_pair(false, "");
     }
 
-    /* void ThreadFileAddDone(string filename) {
-        lock_guard<mutex> lockGuard(contLock);
-    processed.insert(filename);
-}
-pair<bool, string> ThreadGetNewFile() {
-    lock_guard<mutex> guard(contLock);
-    if (!goingtoProcessed.empty()) {
-        string nextFile = goingtoProcessed.front();
-        goingtoProcessed.pop();
-        return make_pair(true, nextFile);
-    }
-    return make_pair(false, "");
-}
-*/
-
-    void ThreadProgram() {
-        bool equal;
+    void ThreadProgram(regex& pattern) {
+        bool equal = false;
         do {
+            unique_lock <mutex> lock(contLock);
+            checking.wait(lock, [&]() { return TasksEnded.load() == TasksAllStart.load() || !goingtoProcessed.empty(); });
             equal = (TasksEnded.load() == TasksAllStart.load());
             auto file = ThreadGetNewFile();
             if (file.first) {
-                ThreadProcessFile(file.second);
-                TasksEnded++;
+                if (processed.count(file.second) == 0) {
+                    TasksAllStart++;
+                    lock.unlock();
+                    ThreadProcessFile(file.second, pattern);
+                    TasksEnded++;
+                    checking.notify_all();
+                }
+                else {
+                    lock.unlock();
+                }
                 equal = false;
             }
-            {
-                lock_guard<mutex> lockGuard(contLock);
-                cout << processed.size() << " " << TasksAllStart.load() << " " << TasksEnded.load() << endl;
-            }
         } while (!equal);
-        cout << "Id of Thread = " << this_thread::get_id() << " end!" << endl;
+        {
+            lock_guard<mutex> lockGuard(contLock);
+            cout << "Id of Thread = " << this_thread::get_id() << " end!" << endl;
+        }
     }
 
     pair<int, int> crawl() {
         cout << "Num of Threads = " << Threads_count << endl;
-        this_thread::sleep_for(chrono::milliseconds(2000));
-
-        pair<int, int> result;
-        chrono::time_point<chrono::system_clock> start, end;
-        start = chrono::system_clock::now();
-
-        TasksAllStart.store(1);
+        processed.clear();
+        TasksAllStart.store(0);
         TasksEnded.store(0);
+
+        time_point<system_clock> start, end;
+        regex pattern("<a href=\"file://([a-za-z0-9.]+html)\">");
+        start = system_clock::now();
+        
         for (int i = 0; i < Threads_count; ++i)
-            threads.push_back(thread(&crawler::ThreadProgram, ref(*this)));
+            threads.push_back(thread(&crawler::ThreadProgram, ref(*this), ref(pattern)));
         for (int i = 0; i < Threads_count; ++i) {
             threads[i].join();
         }
 
-        end = chrono::system_clock::now();
-        int time = chrono::duration_cast<chrono::microseconds>(end - start).count();
-        result.second = time;
-        result.first = processed.size();
-        return result;
+        end = system_clock::now();
+        int time = duration_cast<microseconds>(end - start).count();
+        
+        return { processed.size(), time };
     }
-
-
-private:
-    string startPath;
-    int Threads_count;
-    vector <thread> threads;
-    queue <string> goingtoProcessed;
-    set <string> processed;
-    mutex contLock;
-    atomic <int> TasksAllStart;
-    atomic <int> TasksEnded;
 };
 
 int main() {
