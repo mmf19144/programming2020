@@ -1,0 +1,352 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <stdlib.h>
+#include <iostream>
+#include <fstream>
+#include <thread>
+#include <chrono>
+#include <vector>
+#include <mutex>
+#include <condition_variable>
+#include <queue>
+using namespace std;
+
+template <class T>
+class pipe {
+private:
+	queue <T> q;
+	mutex m;
+	condition_variable c;
+public:
+	void enqueue(const T &v_i) {
+		std::unique_lock<std::mutex> lk(m);
+		q.push(v_i);
+		lk.unlock();
+		c.notify_one();
+	}
+	void dequeue(T &v_i) {
+
+		std::unique_lock<std::mutex> lk(m);
+		while (q.empty()) {
+			c.wait(lk);
+		}
+		v_i = q.front();
+		q.pop();
+		lk.unlock();
+	}
+};
+
+bool cell(vector<vector<bool>>& field, int i, int j) {
+	int N = field.size();
+	if (i == -1) {
+		i = N - 1;
+	}
+	if (i == N) {
+		i = 0;
+	}
+	if (j == -1) {
+		j = N - 1;
+	}
+	if (j == N) {
+		j = 0;
+	}
+	if ((i < N) && (i >= 0) && (j < N) && (j >= 0)) {
+		return field[i][j];
+	}
+	return false;
+}
+
+const int LEFT = 0;
+const int RIGHT = 1;
+const int TOP = 2;
+const int BOTTOM = 3;
+const int TOP_LEFT = 0;
+const int TOP_RIGHT = 1;
+const int BOTTOM_LEFT = 2;
+const int BOTTOM_RIGHT = 3;
+
+class working_thread {
+private:
+	thread t;
+	vector <vector<bool>> field;
+	vector <vector<bool>> field1;
+	int x, y;
+	pipe<vector<bool>> *pipe_line_in[4];
+	pipe<vector<bool>> pipe_line_out[4];
+	pipe<bool> *pipe_corner_in[4];
+	pipe<bool> pipe_corner_out[4];
+public:
+	working_thread(const vector <vector<bool>>& v, int x0, int y0, int n) {
+		x = x0;
+		y = y0;
+		field.resize(n + 2);
+		field1.resize(n + 2);
+		for (int i = 0; i < n + 2; i++) {
+			field[i].resize(n + 2);
+			field1[i].resize(n + 2);
+		}
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				field[i+1][j+1] = v[i + x][j + y];
+			}
+		}
+	}
+	void step() {
+		int n = field.size() - 2;
+
+		vector<bool> left(n);
+		vector<bool> right(n);
+		vector<bool> top(n);
+		vector<bool> bottom(n);
+
+		for (int i = 0; i < n; i++) {
+			left[i] = field[1][i + 1];
+			right[i] = field[n][i + 1];
+			top[i] = field[i + 1][1];
+			bottom[i] = field[i + 1][n];
+		}
+
+		pipe_line_out[LEFT].enqueue(left);
+		pipe_line_out[RIGHT].enqueue(right);
+		pipe_line_out[TOP].enqueue(top);
+		pipe_line_out[BOTTOM].enqueue(bottom);
+		pipe_corner_out[TOP_RIGHT].enqueue(top.back());
+		pipe_corner_out[TOP_LEFT].enqueue(top.front());
+		pipe_corner_out[BOTTOM_RIGHT].enqueue(bottom.back());
+		pipe_corner_out[BOTTOM_LEFT].enqueue(bottom.front());
+
+		auto ll = left;
+		auto rr = right;
+		auto tt = top;
+		auto bb = bottom;
+
+		pipe_line_in[LEFT]->dequeue(left);
+		pipe_line_in[RIGHT]->dequeue(right);
+		pipe_line_in[TOP]->dequeue(top);
+		pipe_line_in[BOTTOM]->dequeue(bottom);
+
+		bool b;
+		pipe_corner_in[TOP_RIGHT]->dequeue(b);
+		field[n + 1][0] = b;
+		pipe_corner_in[TOP_LEFT]->dequeue(b);
+		field[0][0] = b;
+		pipe_corner_in[BOTTOM_RIGHT]->dequeue(b);
+		field[n + 1][n + 1] = b;
+		pipe_corner_in[BOTTOM_LEFT]->dequeue(b);
+		field[0][n + 1] = b;
+
+		for (int i = 0; i < n; i++) {
+			field[0][i + 1] = left[i];
+			field[n + 1][i + 1] = right[i];
+			field[i + 1][0] = top[i];
+			field[i + 1][n + 1] = bottom[i];
+		}
+
+		/*if (0) {
+			static mutex m;
+			m.lock();
+			cout << x << " " << y << endl;
+			for (int j = 0; j < 2 + n; ++j) {
+				for (int i = 0; i < 2 + n; ++i) {
+					cout << field[i][j] ? 1 : 0;
+				}
+				cout << endl;
+			}
+			cout << "left ";
+			for (auto _ : ll)
+				cout << _ ? 1 : 0;
+			cout << endl;
+			cout << "right ";
+			for (auto _ : rr)
+				cout << _ ? 1 : 0;
+			cout << endl;
+			cout << "top ";
+			for (auto _ : tt)
+				cout << _ ? 1 : 0;
+			cout << endl;
+			cout << "bottom ";
+			for (auto _ : bb)
+				cout << _ ? 1 : 0;
+			cout << endl;
+			m.unlock();
+		}*/
+
+		for (int i = 1; i <= n; i++) {
+			for (int j = 1; j <= n; j++) {
+				int alive_cnt = 0;
+				for (int di = i - 1; di <= i + 1; di++) {
+					for (int dj = j - 1; dj <= j + 1; dj++) {
+						if ((i != di || j != dj) && (field[ di][ dj])) {
+							alive_cnt++;
+						}
+					}
+				}
+				if ((alive_cnt == 2 && field[i][j]) || (alive_cnt == 3)) {
+					field1[i][j] = true;
+				}
+				else {
+					field1[i][j] = false;
+				}
+			}
+		}
+		swap(field, field1);
+	}
+
+	static void thread_run(working_thread* _this, int s) {
+		for (int i = 0; i < s; ++i)
+			_this->step();
+	}
+
+	void run(int s) {
+		t = thread(thread_run, this, s);
+	}
+
+	void join(vector <vector<bool>>& v) {
+		t.join();
+
+		int n = field.size() - 2;
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < n; ++j) {
+				v[i + x][j + y] = field[i + 1][j + 1];
+			}
+		}
+ 	}
+
+	friend void ex_hor(working_thread& left, working_thread& right);
+	friend void ex_vert(working_thread& top, working_thread& bottom);
+	friend void ex_main_diag(working_thread& top_left, working_thread& bottom_right);
+	friend void ex_not_main_diag(working_thread& bottom_left, working_thread& top_right);
+};
+
+void ex_hor(working_thread& left, working_thread& right) {
+	left.pipe_line_in[RIGHT] = &right.pipe_line_out[LEFT];
+	right.pipe_line_in[LEFT] = &left.pipe_line_out[RIGHT];
+}
+
+void ex_vert(working_thread& top, working_thread& bottom) {
+	top.pipe_line_in[BOTTOM] = &bottom.pipe_line_out[TOP];
+	bottom.pipe_line_in[TOP] = &top.pipe_line_out[BOTTOM];
+}
+
+void ex_main_diag(working_thread& top_left, working_thread& bottom_right) {
+	top_left.pipe_corner_in[BOTTOM_RIGHT] = &bottom_right.pipe_corner_out[TOP_LEFT];
+	bottom_right.pipe_corner_in[TOP_LEFT] = &top_left.pipe_corner_out[BOTTOM_RIGHT];
+}
+
+void ex_not_main_diag(working_thread& bottom_left, working_thread& top_right) {
+	bottom_left.pipe_corner_in[TOP_RIGHT] = &top_right.pipe_corner_out[BOTTOM_LEFT];
+	top_right.pipe_corner_in[BOTTOM_LEFT] = &bottom_left.pipe_corner_out[TOP_RIGHT];
+}
+
+void run(int i, int j) {
+	for (int jj = 0; jj < j; ++jj)
+	cout << i << endl;
+}
+
+int main(){
+	//auto time0 = chrono::high_resolution_clock::now();
+
+	freopen("input.txt", "r", stdin);
+	freopen("output.txt", "w", stdout);
+
+	int N, T, S;
+	cin >> N >> T >> S;
+	vector <vector<bool>> field(N, vector<bool>(N));
+
+	bool io = true;
+
+	if (io) {
+		for (int i = 0; i < N; i++) {
+			for (int j = 0; j < N; j++) {
+				int n;
+				cin >> n;
+				field[i][j] = n;
+			}
+		}
+	}
+	else {
+		for (int i = 0; i < N; i++) {
+			for (int j = 0; j < N; j++) {
+				field[i][j] = rand() % 2;
+			}
+		}
+	}
+
+	/*
+	for (int k = 0; k < S; k++) {
+		vector <vector<bool>> field0 = field;
+		for (int i = 0; i < N; i++) {
+			for (int j = 0; j < N; j++) {
+				int alive_cnt = 0;
+				for (int di = i-1; di <= i+1; di++) {
+					for (int dj = j-1; dj <= j+1; dj++) {
+						if ((i!=di||j!=dj)&&(cell(field0, di, dj))) {
+							alive_cnt++;
+						}
+					}
+				}
+				if ((alive_cnt == 2 && field0[i][j]) || (alive_cnt == 3)) {
+					field[i][j] = true;
+				}
+				else {
+					field[i][j] = false;
+				}
+			}
+		}
+	}*/
+;
+	int t = 1; //just for test
+
+	int n = N / t;
+	vector<vector<working_thread*>> w(t);
+	for (int i = 0; i < t; i++) {
+		w[i].resize(t);
+		for (int j = 0; j < t; j++) {
+			w[i][j] = new working_thread(field, n * i, n * j, n);
+		}
+	}
+
+	for (int i = 0; i < t; i++) {
+		for (int j = 0; j < t; j++) {
+			ex_vert(*w[i][j], *w[i][(j + 1) % t]);
+			ex_hor(*w[i][j], *w[(i+1) % t][j]);
+			ex_main_diag(*w[i][j], *w[(i+1)%t][(j + 1) % t]);
+			ex_not_main_diag(*w[(i+1)%t][j], *w[i][(j + 1) % t]);
+		}
+	}
+
+	for (int i = 0; i < t; i++) {
+		for (int j = 0; j < t; j++) {
+			w[i][j]->run(S);
+		}
+	}
+
+	for (int i = 0; i < t; i++) {
+		for (int j = 0; j < t; j++) {
+			w[i][j]->join(field);
+		}
+	}
+
+	for (int i = 0; i < t; i++) {
+		for (int j = 0; j < t; j++) {
+			delete w[i][j];
+		}
+	}
+
+	if (io) {
+		for (int i = 0; i < N; i++) {
+			for (int j = 0; j < N; j++) {
+				if (field[i][j])
+					cout << 1 << " ";
+				else
+					cout << 0 << " ";
+			}
+			cout << endl;
+		}
+	}
+
+	//auto time = chrono::high_resolution_clock::now();
+	//cout << "Time spent: " << std::chrono::duration_cast<std::chrono::milliseconds>(time - time0).count() * 1e-3 << endl;
+
+	return 0;
+}
