@@ -212,8 +212,7 @@ int main()
 	Matrix K(matrix_size, karray);
 
 	fout << ((A + B * (!C) + K) * (!D));
-	
-	
 	delete [] karray;
+		
 	return 0;
 }
