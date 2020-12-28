@@ -87,11 +87,12 @@ public:
         }
     }
 
+    ~Crawler() = default;
+
 };
 
 
 void run(int thread_id, Crawler *cr) {
-
 
     while (true) {
         string file_to_open = cr->queuePop();
