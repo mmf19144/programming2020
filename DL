@@ -25,15 +25,16 @@ public:
 
 class Expression {
 public:
-    virtual shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) = 0;
+    virtual shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) = 0;
     virtual int get_val() {
         throw Exception("Type error, result isn't an value type");
     }
+    virtual void delete_cyrcle() {}
     virtual ~Expression() = default;
 };
 
 
-shared_ptr <Expression> find_exp(unordered_map <string, shared_ptr <Expression>>& const  env, string var) {
+shared_ptr <Expression> find_exp(unordered_map <string, shared_ptr <Expression>>& env, string var) {
     auto result = env.find(var);
     if (result == env.end())
         throw Exception("Undefined variable error");
@@ -47,7 +48,7 @@ private:
     string var;
 public:
     Variable(string _v) : var(_v) {}
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         return find_exp(env, var);
     }
 };
@@ -58,7 +59,7 @@ private:
     int val;
 public:
     Value(int _v) : val(_v) {}
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         return shared_from_this();
     }
     int get_val() {
@@ -72,10 +73,14 @@ private:
     shared_ptr <Expression> left = nullptr, right = nullptr;
 public:
     Add(shared_ptr <Expression> _l, shared_ptr <Expression> _r) : left(_l), right(_r) {}
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         int left_sum = left->eval(env)->get_val();
         int right_sum = right->eval(env)->get_val();
         return make_shared<Value>(left_sum + right_sum);
+    }
+    void delete_cyrcle() {
+        left->delete_cyrcle();
+        right->delete_cyrcle();
     }
 };
 
@@ -90,7 +95,7 @@ public:
     If(shared_ptr <Expression> _l, shared_ptr <Expression> _r) : left(_l), right(_r) {}
     void set_then(shared_ptr <Expression> _t) { then_exp = _t; }
     void set_else(shared_ptr <Expression> _e) { else_exp = _e; }
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         int left_sum = left->eval(env)->get_val();
         int right_sum = right->eval(env)->get_val();
         if (left_sum > right_sum) {
@@ -100,24 +105,33 @@ public:
             return else_exp->eval(env);
         }
     }
+    void delete_cyrcle() {
+        left->delete_cyrcle();
+        right->delete_cyrcle();
+        then_exp->delete_cyrcle();
+        else_exp->delete_cyrcle();
+    }
 };
 
 
 class Function : public Expression, public enable_shared_from_this<Function> {
 private:
     string arg;
+    string func_name;
     shared_ptr <Expression> action;
     unordered_map <string, shared_ptr <Expression>> lexical_scope;
     friend class Let;
 public:
     Function(string _a, shared_ptr <Expression> _ac) : arg(_a), action(_ac) {}
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
-        lexical_scope = env;
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         return shared_from_this();
     }
     shared_ptr <Expression> eval(shared_ptr <Expression> arg_val) {
         lexical_scope[arg] = arg_val;
         return action->eval(lexical_scope);
+    }
+    void delete_cyrcle() {
+        lexical_scope.erase(func_name);
     }
 };
 
@@ -130,13 +144,18 @@ public:
     Let(string _v) : var(_v) {}
     void set_value(shared_ptr <Expression> _value) { value = _value; }
     void set_body(shared_ptr <Expression> _body) { body = _body; }
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         env[var] = value->eval(env);
         shared_ptr <Function> fun = dynamic_pointer_cast<Function>(env[var]);
         if (fun != nullptr) {
             fun->lexical_scope = env;
+            fun->func_name = var;
         }
         return body->eval(env);
+    }
+    void delete_cyrcle() {
+        value->delete_cyrcle();
+        body->delete_cyrcle();
     }
 };
 
@@ -145,13 +164,17 @@ class Call : public Expression, public enable_shared_from_this<Call> {
 private:
     shared_ptr <Expression> func, arg;
 public:
-    Call (shared_ptr <Expression> _f, shared_ptr <Expression> _a) : func(_f), arg(_a) {}
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
+    Call(shared_ptr <Expression> _f, shared_ptr <Expression> _a) : func(_f), arg(_a) {}
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         shared_ptr <Function> call_func = dynamic_pointer_cast<Function>(func->eval(env));
         if (call_func == nullptr) {
             throw Exception("Type error");
         }
         return call_func->eval(arg->eval(env));
+    }
+    void delete_cyrcle() {
+        func->delete_cyrcle();
+        arg->delete_cyrcle();
     }
 };
 
@@ -164,7 +187,7 @@ public:
     void add(shared_ptr <Expression> new_exp) {
         arr.push_back(new_exp);
     }
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         shared_ptr <Array> result = make_shared<Array>();
         for (auto iter : arr) {
             result->arr.push_back(iter->eval(env));
@@ -195,7 +218,7 @@ private:
 public:
     Gen(shared_ptr <Expression> _l, shared_ptr <Expression> _f) : length(_l), func(_f) {}
 
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         int len = length->eval(env)->get_val();
         if (len < 0) {
             throw Exception("Bad argument error");
@@ -220,7 +243,7 @@ public:
 
     At(shared_ptr <Expression> _a, shared_ptr <Expression> _ind) : arr(_a), index(_ind) {}
 
-    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& const  env) {
+    shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
         shared_ptr<Array> ptr = dynamic_pointer_cast<Array>(arr->eval(env));
         if (ptr == nullptr) {
             throw Exception("Type error");
@@ -378,7 +401,7 @@ int main()
         else if (dynamic_pointer_cast<Array>(result) != nullptr) {
             (dynamic_pointer_cast<Array>(result))->print(fout);
         }
-
+        result->delete_cyrcle();
     }
     catch (...) {
         fout << "ERROR" << endl;
