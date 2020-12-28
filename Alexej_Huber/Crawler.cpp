@@ -3,7 +3,6 @@
 #include <string>
 #include <regex>
 #include <chrono>
-#include <thread>
 #include <mutex>
 #include <unordered_map>
 #include <condition_variable>
@@ -11,10 +10,8 @@
 
 using namespace std;
 
-
 class Crawler
 {
-
 	const regex reg_modify{ "<a href=\"([^\"]*)\">" };
 	const size_t max_threads;
 
@@ -34,7 +31,7 @@ class Crawler
 		return { first, second };
 	}
 
-	vector<string> get_links(string & data)
+	vector<string> get_links(string& data)
 	{
 		vector<string> pairs;
 		smatch m;
@@ -46,6 +43,7 @@ class Crawler
 
 		return pairs;
 	}
+
 
 	void parsing(string address)
 	{
@@ -68,22 +66,21 @@ class Crawler
 				}
 			}
 		}
+		mut.lock();
 		work_threads--;
 		if (work_threads <= 0 && current_files.empty())
 		{
 			cond_var.notify_all();
 		}
+		mut.unlock();
 	}
 	
 	void start_parse()
 	{
-		{
-			std::unique_lock<std::mutex> lk(mut);
-			cout << "Thread enter: id: " << std::this_thread::get_id() << "\r\n";
-		}
 		do
 		{
 			string address;
+
 			{
 				std::unique_lock<std::mutex> lk(mut);
 				if (current_files.empty() && work_threads > 0)
@@ -95,17 +92,14 @@ class Crawler
 
 				current_files.erase(current_files.begin());
 				viewed_files.insert({ address, address });
-				bFilesInQueue = !current_files.empty();
 				work_threads++;
 			}
+
 			parsing(address);
 		} while (true);
 
-		{
-			std::unique_lock<std::mutex> lk(mut);
-			cout << "Thread exit: id: " << std::this_thread::get_id() << "\r\n";
-		}
 	}
+
 
 public:
 	Crawler(const size_t max_threads = 8) : max_threads{ max_threads }
@@ -124,7 +118,7 @@ public:
 			threads.push_back(async(launch::async, [&]() { start_parse(); }));
 		}
 
-		for (auto & t : threads)
+		for (auto& t : threads)
 		{
 			t.wait();
 		}
@@ -140,7 +134,7 @@ public:
 int main()
 {
 	string address = "file://0.html";
-	cin >> address;
+	// cin >> address;
 
 	Crawler crawler{ 8 };
 	crawler.run(address);
