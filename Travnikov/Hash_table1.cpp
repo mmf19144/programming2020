@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <stdio.h>
 #include <vector>
-
+#include <map>
 using namespace std;
 
 template <typename K,typename  N>
@@ -111,11 +111,20 @@ public:
         for (int i = 0; i < this->cap; i++) {
             if (arr[i].getstatus() == 1) {
                 size_t hash = std::hash<K>{}(arr[i].getkey()) % newcap;
-                for (int j = hash; j < newcap; j++) {
-                    if (newarr[j].getstatus() != 1) {
+                for (int j = hash; j < newcap + (newcap-hash); j++) {
+                    if (newarr[j].getstatus() != 1 && hash < newcap) {
                         newarr[j].write(arr[i].getkey(), arr[i].getval());
                         break;
                     }
+                    else if (j >=newcap && newarr[j-newcap].getstatus() != 1){
+                        newarr[j-newcap].write(arr[i].getkey(), arr[i].getval());
+                        break;
+                    }
+
+
+
+
+
                 }
             }
         }
@@ -142,53 +151,73 @@ public:
         return false;
     }
 
-    N find(K key) {
-        size_t hash = this->get_hash(key);
-        for (int i = hash; i < this->cap; i++) {
-            if (arr[i].getstatus() == 1 && arr[i].getkey() == key) {
-                return arr[i].getval();
-            } else if (arr[i].getstatus() == 0) {
-                break;
+    int find(K key, size_t hash) {
+
+        int i = hash;
+        while (arr[i].getstatus() != 0){
+            if (i<this->cap) {
+                if (arr[i].getstatus() == -1) {
+                    i++;
+                    continue;
+                }
+                if (arr[i].getstatus() == 1 && arr[i].getkey() == key)
+                    return i;
+                if (arr[i].getstatus() == 1) {
+                    i++;
+                    continue;
+                }
+            }
+            else {
+                if (arr[i-this->cap].getstatus() == -1) {
+                    i++;
+                    continue;
+                }
+                if (arr[i-this->cap].getstatus() == 1 && arr[i].getkey() == key)
+                    return i-this->cap;
+                if (arr[i-this->cap].getstatus() == 1) {
+                    i++;
+                    continue;
+                }
             }
         }
-        // N nothing;
-        return nullptr;
+        return -1;
+
     }
 
     void add(size_t hsh,K key, N value) {
 
         size_t hash = this->get_hash(key);
-        for (int i = hash; i < this->cap * 2; i++) {
-            if (i<this->cap) {
+        int search = find(key,hash);
+        if (search >=0){
+            arr[search].write(key,value);
+            if (this->is_full()) this->extend();
 
-                if (arr[i].getstatus() != 1) {
-                    arr[i].write(key, value);
-                    this->size++;
+        }
+        else {
+            for (int i = hash; i < this->cap * 2; i++) {
+                if (i < this->cap) {
 
-                    if (this->is_full()) this->extend();
-                    break;
+                    if (arr[i].getstatus() != 1) {
+                        arr[i].write(key, value);
+                        this->size++;
 
-                }
-                if (arr[i].getkey() == key) {
-                    arr[i].write(key, value);
-                    if (this->is_full()) this->extend();
-                    break;
-                }
-            }
-            if (i >=this->cap){
-                int k = i-this->cap;
-                if (arr[k].getstatus() != 1 ) {
-                    arr[k].write(key, value);
-                    this->size++;
+                        if (this->is_full()) this->extend();
+                        break;
 
-                    if (this->is_full()) this->extend();
-                    break;
+                    }
 
                 }
-                if ( arr[k].getkey() == key) {
-                    arr[k].write(key, value);
-                    if (this->is_full()) this->extend();
-                    break;
+                if (i >= this->cap) {
+                    int k = i - this->cap;
+                    if (arr[k].getstatus() != 1) {
+                        arr[k].write(key, value);
+                        this->size++;
+
+                        if (this->is_full()) this->extend();
+                        break;
+
+                    }
+
                 }
             }
         }
@@ -211,27 +240,27 @@ public:
         }
     }
 
+
     int count_unique() {
-        //for(int i = 0 ;i<this->cap;i++) {
-        //cout <<arr[i].getstatus();
-        int res = 0;
+        int uniqueCount = 0;
 
-        // Pick all elements one by one
-        for (int i = 0; i < this->cap; i++) {
-            if (arr[i].getstatus() == 1) {
-                int j = 0;
-                cout << arr[i].getval() << endl;
-                for (j = 0; j < i; j++){
-                    if (arr[i].getval() == arr[j].getval())
-                        break;}
-
-                // If not printed earlier, then print it
-                if (i == j)
-                    res++;
+        map <N, bool> mapOfValues;
+        for (size_t i = 0; i < this->cap && uniqueCount < this->size; i++) {
+            if (arr[i].getstatus()) {
+                if (mapOfValues[arr[i].getval()] == false) {
+                    mapOfValues[arr[i].getval()] = true;
+                    uniqueCount++;
+                }
             }
         }
-        return res;
+        mapOfValues.clear();
+
+
+        return uniqueCount ;
     }
+
+
+
     void printtable(){
         for(int i =0;i<this->cap;i++){
             cout << arr[i].getstatus() << ' ' << arr[i].getval() << endl;
