@@ -1,0 +1,128 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+
+using namespace std;
+
+struct Key {
+	size_t vert;//текущее состояние
+	char letter;//буква перехода
+
+	Key() : vert(0), letter(0) {}
+	Key(size_t c, char s): vert(c), letter(s) {}
+};
+
+template<> struct less<Key>//иначе несравниваются ключи в таблице
+{
+	bool operator() (const Key& lhs, const Key& rhs) const
+	{
+		if (lhs.vert < rhs.vert)
+			return true;
+		else if (lhs.vert > rhs.vert)
+			return false;
+		else {
+			if (lhs.letter < rhs.letter)
+				return true;
+			else
+				return false;
+		}
+	}
+};
+
+class _KA {
+private:
+	map<Key, vector<size_t>> tab;//таблица: ключ-текущее сост. и буква перехода, значение-вектор состояний, куда можно перейти
+	list<vector<size_t>> ways;//список всевозможных путей
+	vector<size_t> finish;//вектор конечных состояний
+	size_t start;
+		
+public:
+	void check(const string& str) {//можно string_veiw
+		for (size_t k = 0; k < str.length(); k++) {
+			for (auto i = ways.begin(); i != ways.end();) {//проходим по всем путям
+				size_t now = (*i)[(*i).size() - 1];//в каждом пути смотрим последнее состояние
+				Key c(now, str[k]);
+				if (tab[c].size() == 0) {//если не можем перейти из состояния по букве, то удаляем путь
+					i = ways.erase(i);
+					continue;
+				}
+				//если можем много куда перейти, то создаём путь для каждого варианта
+				size_t n = tab[c].size() - 1;//-1, т.к. одна строчка уже есть(исходная)
+				auto p = ways.begin();//просто инициализация вспомогательного указателя
+				for (size_t j = 0; j < n; j++) {
+					p = ways.emplace(i, *i);
+				}//на выходе р будет указывать на последний из добавленных вариантов путей
+				//а i будет последним из них всех
+
+				(*i).push_back(tab[c][0]);
+				
+				for (; n != 0; p--) {
+  					(*p).push_back(tab[c][n]);
+					n--;
+				}
+				i++;
+			}
+		}
+	}
+
+	string run(const string& str) {//можно string_view
+		string asw;
+		vector<size_t> sup;
+		sup.push_back(start);
+		ways.push_back(sup);
+		
+		check(str);
+		asw = "NO";
+		for (auto i = ways.begin(); i != ways.end(); i++) {//перебераем все пути и ищем конечные состояния
+			for (size_t j = 0; j < finish.size(); j++)
+				if ((*i)[(*i).size() - 1] == finish[j]) {
+					asw = "YES";
+					break;
+				}
+		}
+		ways.clear();
+		
+		return asw;
+	}
+
+	void scan(ifstream& in) {
+		size_t end_c, func_c, vert_c;
+		in >> vert_c >> start >> end_c;
+		for (size_t i = 0; i < end_c; i++) {
+			size_t value;
+			in >> value;
+			finish.push_back(value);
+		}
+		in >> func_c;
+		size_t from, to;
+		char value;
+		for (size_t i = 0; i < func_c; i++) {
+			in >> from >> to >> value;
+			Key c(from, value);
+			tab[c].push_back(to);
+		}
+	}
+};
+
+int main()
+{
+	ofstream fout("output.txt");
+	ifstream fin("input.txt");
+	_KA obj;
+	obj.scan(fin);
+	
+	size_t count;
+	fin >> count;
+	string plan;
+	for (size_t i = 0; i < count; i++) {
+		fin >> plan;
+		fout << obj.run(plan) << endl;
+	}
+	
+	fout.close();
+	fin.close();
+	return 0;
+}
+
