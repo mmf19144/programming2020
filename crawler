@@ -1,0 +1,142 @@
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <set>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <cstring>
+#include <chrono>
+#include <regex>
+#include <atomic>
+
+using namespace std;
+
+
+class Parser {
+private:
+    mutex mutex_lock;
+    
+    string start_directory = "test_data\\";
+    string finish_directory = "copy_data\\";
+    
+    queue <string> for_checking;
+    set <string> finish_their_life;
+
+    atomic <int> started_parsing;
+    atomic <int> finish_parsing;
+    
+    condition_variable check;
+
+    int num_thread = 0;
+    int parsing_time = 0;
+
+    void add_new_parsing_files(vector<string>& add_files) {
+        for (auto i : add_files)
+            for_checking.push(i);
+    }
+
+    void start_parsing_file(string file, regex& find_pattern) {
+        string file_line;
+        vector<string> found_parsing_files;
+        ifstream fin(start_directory + file);
+        ofstream fout(finish_directory + file);
+        while (getline(fin, file_line)) {
+            smatch tag_match;
+            fout << file_line << endl;
+            while (regex_search(file_line, tag_match, find_pattern)) {
+                found_parsing_files.push_back(tag_match.str(1));
+                file_line = move(tag_match.suffix().str());
+            }
+        }
+        fin.close();
+        fout.close();
+        lock_guard<mutex> lockGuard(mutex_lock);
+        add_new_parsing_files(found_parsing_files);
+        finish_their_life.insert(file);
+    }
+
+
+    string get_new_file() {
+        string new_file = "";
+        if (!for_checking.empty()) {
+            new_file = move(for_checking.front());
+            for_checking.pop();
+        }
+        return new_file;
+    }
+
+
+    bool check_probably_end() {
+        return finish_parsing == started_parsing;
+    }
+
+
+    void add_parsing_worker(regex& find_pattern) {
+        bool stop_parsing = false;
+        while (!stop_parsing) {
+            unique_lock <mutex> lock(mutex_lock);
+            check.wait(lock, [&]() { return check_probably_end() || !for_checking.empty(); });
+            stop_parsing = check_probably_end();
+            string filename = move(get_new_file());
+            if (filename != "") {
+                if (!finish_their_life.count(filename)) {
+                    started_parsing++;
+                    lock.unlock();
+                    start_parsing_file(filename, find_pattern);
+                    finish_parsing++;
+                    check.notify_all();
+                }
+                stop_parsing = false;
+            }
+            else {
+                lock.unlock();
+            }
+        }
+    }
+public:
+    Parser(int num, string start) : num_thread(num) {
+        for_checking.push(start);
+    }
+
+    Parser(ifstream& fin) {
+        string start_file;
+        fin >> start_file >> num_thread;
+        for_checking.push(start_file);
+    }
+
+    void start_work() {
+        parsing_time = 0;
+        finish_their_life.clear();
+        started_parsing = finish_parsing = 0;
+        chrono::time_point<chrono::system_clock> start = chrono::system_clock::now();
+        regex find_pattern("<a href=\"file://([a-za-z0-9.]+html)\">");
+        vector <thread> workers;
+        for (int i = 0; i < num_thread; ++i)
+            workers.push_back(thread(&Parser::add_parsing_worker, ref(*this), ref(find_pattern)));
+        for (auto& i : workers) {
+            i.join();
+        }
+        chrono::time_point<chrono::system_clock> end = chrono::system_clock::now();
+        parsing_time = chrono::duration_cast<chrono::microseconds>(end - start).count();
+    }
+
+    int get_parsing_time() {
+        return parsing_time;
+    }
+
+    int get_number_checked_files() {
+        return finish_their_life.size();
+    }
+};
+
+int main() {
+    ifstream fin("input.txt");
+    ofstream fout("output.txt");
+    Parser crawler(fin);
+    crawler.start_work();
+    fout << crawler.get_number_checked_files() << " " << crawler.get_parsing_time() << " microseconds";
+    fin.close();
+    fout.close();
+    return 0;
+}
