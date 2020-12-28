@@ -65,7 +65,8 @@ public:
 		{
 			index = matrix[index][ch];
 		}
-		return std::find(terminal_states.begin(), terminal_states.end(), index) != terminal_states.end();
+		return terminal_states.find(index) != terminal_states.end();
+		//return std::find(terminal_states.begin(), terminal_states.end(), index) != terminal_states.end();
 	}
 
 	void determine()
@@ -99,7 +100,8 @@ public:
 		{
 			for (const auto& it1 : terminal_states)
 			{
-				if (std::find(it.first.begin(), it.first.end(), *(it1.begin())) != it.first.end())
+				if (it.first.find(*(it1.begin())) != it.first.end())
+				// if (std::find(it.first.begin(), it.first.end(), *(it1.begin())) != it.first.end())
 				{
 					ts_1.insert(it.first);
 					break;
