@@ -1,0 +1,133 @@
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <regex>
+#include <set>
+#include <unordered_map>
+
+
+using namespace std;
+
+class DKA {
+
+public:
+    struct Node {
+        Node(bool last) : last_one(last) {}
+
+        unordered_map <size_t, size_t> transition;
+        bool last_one;
+
+        bool Transition_yes(size_t key) {
+            return transition.find(key) != transition.end();
+        }
+    };
+
+    DKA(size_t countstate, size_t firststate, vector<size_t>& laststate):
+
+        countStates(countstate), startState(firststate) {
+        states.resize(countStates, nullptr);
+
+        for (size_t i = 0; i < countStates; ++i)
+            states[i] = new Node(false);
+        for (auto i : laststate)
+            states[i]->last_one = true;
+    }
+
+    void insert(size_t from, size_t to, char val) {
+        states[from]->transition.insert(make_pair(charCode(val), to));
+    }
+
+
+    void print() {
+        for (size_t i = 0; i < countStates; ++i) {
+            cout << "Node " << i << ": [ ";
+            for (auto j : states[i]->transition)
+                cout << " {" << (char)(j.first + 'a') << ";" << j.second << "} ";
+            cout << " ] final = " << (states[i]->last_one ? "true" : "false") << endl;
+        }
+    }
+
+    bool has(string checkscan) {
+        Node* ptr = states[startState];
+
+        for (auto i : checkscan) {
+            if (!ptr->Transition_yes(charCode(i))) return false;
+            size_t index = ptr->transition[charCode(i)];
+            ptr = states[index];
+        }
+        return ptr->last_one;
+    }
+    ~DKA() {
+        for (size_t i = 0; i < countStates; ++i)
+            delete states[i];
+     }
+private:
+    static size_t charCode(char c) {
+        return c - 'a';
+    }
+
+    size_t countStates;
+    size_t startState;
+    vector<Node*> states;
+
+};
+//
+//class NKA {
+//public:
+//    class Node {
+//        unordered_map<size_t, set<size_t>> transition;
+//        bool last_one;
+//
+//        Node(bool last_one) : last_one(last_one) {}
+//        bool hasTransition(size_t key) {
+//            return !transition.empty();
+//        }
+//    };
+//
+//
+//private:
+//    vector<Node*> states;
+//    size_t startState;
+//    size_t countStates;
+//};
+
+int main() {
+
+    ifstream fin("input.txt");
+    ofstream fout("output.txt");
+
+    size_t n;
+    size_t k;
+    size_t f;
+    size_t p;
+
+    fin >> n >> k >> f;
+
+    vector<size_t> laststates(f);
+    for (size_t i = 0; i < f; ++i)
+        fin >> laststates[i];
+
+    DKA dka(n, k, laststates);
+    fin >> p;
+
+    size_t from;
+    size_t to;
+    char val;
+
+    for (size_t i = 0; i < p; ++i) {
+        fin >> from >> to >> val;
+        dka.insert(from, to, val);
+    }
+    dka.print();
+
+    size_t t;
+    string s;
+    fin >> t;
+    for (size_t i = 0; i < t; ++i) {
+        fin >> s;
+        fout << (dka.has(s) ? "YES" : "NO") << endl;
+    }
+
+
+
+}
