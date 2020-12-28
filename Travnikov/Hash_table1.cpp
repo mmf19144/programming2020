@@ -228,14 +228,28 @@ public:
 
     void remove(K key) {
         size_t hash = this->get_hash(key);
-        for (int i = hash; i < this->cap; i++) {
-            if (arr[i].getstatus() == 1 && arr[i].getkey() == key) {
-                arr[i].setstatus(-1);
-                this->size--;
+        for (int i = hash; i < this->cap + (this->cap - hash); i++) {
+            if(i<this->cap) {
 
-                return;
-            } else if (arr[i].getstatus() == 0) {
-                break;
+
+                if (arr[i].getstatus() == 1 && arr[i].getkey() == key) {
+                    arr[i].setstatus(-1);
+                    this->size--;
+
+                    return;
+                } else if (arr[i].getstatus() == 0) {
+                    break;
+                }
+            }
+            else {
+                if (arr[i-this->cap].getstatus() == 1 && arr[i].getkey() == key) {
+                    arr[i-this->cap].setstatus(-1);
+                    this->size--;
+
+                    return;
+                } else if (arr[i-this->cap].getstatus() == 0) {
+                    break;
+                }
             }
         }
     }
