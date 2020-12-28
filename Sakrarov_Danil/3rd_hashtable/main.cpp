@@ -9,8 +9,8 @@
 template<typename K, typename V>
 class Slot {
 private:
-    K key;
-    V value;
+    K Key;
+    V Value;
     bool Filled;
     bool Deleted = false;
 public:
@@ -19,11 +19,11 @@ public:
 
     V getValue() {
         assert(Filled && !Deleted);
-        return value;
+        return Value;
     }
 
     K getKey() {
-        return key;
+        return Key;
     }
 
     bool getFilled() {
@@ -35,16 +35,16 @@ public:
     }
 
     void setValue(const V &s) {
-        value = s;
+        Value = s;
         Filled = true;
     }
 
     void setKey(const K &s) {
-        key = s;
+        Key = s;
         Filled = true;
     }
 
-    void delete_element() {
+    void deleteElement() {
         Filled = false;
         Deleted = true;
     }
@@ -70,23 +70,23 @@ public:
         delete[] table;
     }
 
-    size_t get_cap() {
+    size_t getCap() {
         return capacity;
     }
 
-    size_t get_size() {
+    size_t getSize() {
         return size;
     }
 
 
     void addElement(const K &addKey, const V &addValue) {
         size_t hash_value = std::hash<K>()(addKey) % size;
-        add_val(hash_value, addKey, addValue);
+        addVal(hash_value, addKey, addValue);
     };
 
-    void delete_element(const K &delKey) {
+    void deleteElement(const K &delKey) {
         size_t hash_val = std::hash<K>()(delKey) % size;
-        del_val(hash_val, delKey);
+        delVal(hash_val, delKey);
     };
 
 
@@ -161,7 +161,7 @@ public:
             if (!table[iter].getDeleted() && table[iter].getFilled())
                 return table[iter].getValue();
             else
-                return nullptr;
+                throw std::invalid_argument("key doesn't exists");;
         }
     }
 
@@ -180,7 +180,7 @@ public:
         capacity = tmp.capacity;
     }
 
-    void add_val(const size_t hash_value, const K &addKey, const V &addValue) {
+    void addVal(const size_t hash_value, const K &addKey, const V &addValue) {
         size_t iter = hash_value;
         if (table[iter].getFilled() && table[iter].getKey() == addKey) {
             table[iter].setValue(addValue);
@@ -201,13 +201,13 @@ public:
     }
 
 
-    void del_val(size_t hash_value, const K &delKey) {
+    void delVal(size_t hash_value, const K &delKey) {
 
         size_t iter = hash_value;
 
         while (table[iter].getFilled()) {
             if (table[iter].getFilled() && table[iter].getKey() == delKey) {
-                table[iter].delete_element();
+                table[iter].deleteElement();
                 capacity--;
                 return;
             }
@@ -228,31 +228,31 @@ void start(std::ifstream &fin, const std::string &out) {
     size_t countLoop;
     fin >> countLoop;
 
-    K key;
-    V value;
+    K Key;
+    V Value;
     char operation;
 
     for (size_t i = 0; i < countLoop; i++) {
         fin >> operation;
 
         if (operation == 'A') {
-            fin >> key >> value;
-            Table.addElement(key, value);
+            fin >> Key >> Value;
+            Table.addElement(Key, Value);
             continue;
         }
         if (operation == 'R') {
-            fin >> key;
-            Table.delete_element(key);
+            fin >> Key;
+            Table.deleteElement(Key);
             continue;
         }
     }
 
-    HashMap<V, bool> mapOfValues(Table.get_size()); //values as keys for cont unique elements
+    HashMap<V, bool> mapOfValues(Table.getSize()); //values as keys for cont unique elements
     for (auto it: Table) {
-            mapOfValues.addElement(it.second, 1);
+        mapOfValues.addElement(it.second, 1);
     }
 
-    fout << Table.get_cap() << " " << mapOfValues.get_cap();;
+    fout << Table.getCap() << " " << mapOfValues.getCap();;
 
 
     fout.close();
