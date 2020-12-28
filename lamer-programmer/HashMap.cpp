@@ -168,12 +168,16 @@ public:
 		{
 			do
 			{
-				index++;
+
 				if (index == capacity)
 				{
 					throw std::out_of_range{"HashMap::iterator::operator++() - выход за пределы таблицы"};
 				}
-				
+				index++;
+				if (index == capacity)
+				{
+					continue;
+				}
 			} while (arr[index] == nullptr);
 			return *this;
 		}
@@ -183,12 +187,16 @@ public:
 			iterator temp{*this};
 			do
 			{
-				index++;
 				if (index == capacity)
 				{
 					throw std::out_of_range{"HashMap::iterator::operator++(int) - выход за пределы таблицы"};
 				}
-				
+
+				index++;
+				if (index == capacity)
+				{
+					continue;
+				}
 			} while (arr[index] == nullptr);
 			return temp;
 		}
