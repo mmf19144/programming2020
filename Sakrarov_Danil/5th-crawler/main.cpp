@@ -8,10 +8,12 @@
 #include <thread>
 #include <chrono>
 #include <utility>
+#include <sstream>
+
 
 using namespace std;
 
-const string BASE_PATH = "test_data";
+#define BASE_PATH "test_data/"
 
 class FileCrawler {
 private:
@@ -21,10 +23,12 @@ private:
     size_t ready_tasks = 0;
     size_t added_tasks = 0;
 public:
-    FileCrawler(const string &baseUrl, string &basePath) {
-        tasks.push(baseUrl);
-        parsed_files.insert(baseUrl);
-        added_tasks++;
+    const regex hrefRegexp;
+    const regex urlRegexp;
+
+    explicit FileCrawler(const string &baseUrl) : hrefRegexp("<a\\s+(?:[^>]*?\\s+)?href=\"([^\"]*)\""), urlRegexp(
+            R"((http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/|file:\/\/)?([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?))") {
+        pushTask(baseUrl);
     }
 
     ~FileCrawler() = default;
@@ -50,48 +54,56 @@ public:
         }
     }
 
-    void run(size_t threads_cnt);
+    pair<size_t, double> run(size_t threads_cnt);
 
-    bool hasWork() const {
+    bool hasWork() {
+        unique_lock<mutex> guard(pushLock);
         return ready_tasks < added_tasks;
     }
 
     void finishTask() {
+        unique_lock<mutex> guard(pushLock);
         ready_tasks++;
     }
 
 
-    static string getStrByHref(const string &href) {
-        string delimiter = "://";
-        auto finding = href.find(delimiter);
-        if (finding == -1) {
+    string getStrByHref(const string &href) {
+        smatch result;
+        regex_search(href, result, urlRegexp);
+
+
+        if (result.empty()) {
             throw invalid_argument("Protocol is not available");
         }
+        auto protocol = result.str(1);
+        auto path = result.str(2);
 
-        string protocol = href.substr(0, finding);
-        string path = href.substr(finding + delimiter.length(), href.length());
-        if (protocol == "file") {
-            ifstream fin(BASE_PATH + '/' + path);
-            return string((istreambuf_iterator<char>(fin)),
-                          (istreambuf_iterator<char>()));
+
+        if (protocol == "file://") {
+            ifstream fin(BASE_PATH + path);
+            std::stringstream strStream;
+            strStream << fin.rdbuf();
+            return strStream.str();
         }
+
         throw invalid_argument("Protocol is not available");
     }
 };
 
 
 void threadFunction(FileCrawler *Crawler) {
-    regex regexp("<a[^>]* href=\"([^<]+)\"[^>]*>");
+
     while (Crawler->hasWork()) {
         auto res = Crawler->getTask();
         do {
             smatch result;
 
             if (res.first) {
-                string body = FileCrawler::getStrByHref(res.second);
-                while (regex_search(body, result, regexp)) {
+                string body = Crawler->getStrByHref(res.second);
+                while (regex_search(body, result, Crawler->hrefRegexp)) {
                     string href = result.str(1);
                     Crawler->pushTask(href);
+//                    cout << href << endl;
                     body = result.suffix().str();
                 }
                 Crawler->finishTask();
@@ -102,15 +114,16 @@ void threadFunction(FileCrawler *Crawler) {
     }
 }
 
-void FileCrawler::run(size_t threads_cnt) {
+pair<size_t, double> FileCrawler::run(size_t threads_cnt) {
 
     vector<thread *> threads;
     threads.resize(threads_cnt);
+    auto start = std::chrono::system_clock::now();
     for (int i = 0; i < threads_cnt; i++) {
         threads[i] = new thread(threadFunction, this);
     }
 
-    auto start = std::chrono::system_clock::now();
+
     for (int i = 0; i < threads_cnt; i++)
         threads[i]->join();
 
@@ -118,19 +131,18 @@ void FileCrawler::run(size_t threads_cnt) {
 
     std::chrono::duration<double> elapsed_seconds = end - start;
 
-    cout << "READY " << parsed_files.size() << " pages by " << elapsed_seconds.count() << " s" << endl;
+    return {ready_tasks, elapsed_seconds.count()};
 }
 
 int main() {
     ifstream fin("input.txt");
-    ofstream fout("output.html");
+    ofstream fout("output.txt");
     string baseHref;
     size_t workersCnt;
     fin >> baseHref >> workersCnt;
-    string base_path = "test_data";
-    FileCrawler craw(baseHref, base_path);
+    FileCrawler craw(baseHref);
 
-    craw.run(workersCnt);
-
+    auto a = craw.run(workersCnt);
+    fout << a.first << " " << a.second << endl;
     return 0;
 }
