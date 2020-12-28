@@ -9,15 +9,17 @@ template <typename T>
 class CVector
 {
     T* p_vector;
-    int size;
+    size_t size;
+    size_t total_size;
 
 public:
-    CVector() { size = 0; p_vector = 0; }
+    CVector() { size = 0; total_size = 0; p_vector = 0; }
     CVector(size_t s);
     CVector(CVector& obj);
     ~CVector() { if (p_vector) delete[] p_vector; }
 
     int getsize() { return size; }
+    int get_total_size() { return total_size; }
     void push_back(T data);
     void erase(size_t index);
     T& operator[](int i);
@@ -30,12 +32,19 @@ template <typename T>
 void CVector<T> ::push_back(T data) {
     T* p_new = p_vector;
     size = size + 1;
-    p_vector = new T[size];
+    if (size >= total_size)
+    {
+        total_size = size * 2;
+        p_vector = new T[total_size];
 
-    for (int i = 0; i < size - 1; i++)
-        p_vector[i] = p_new[i];
-
-    p_vector[size - 1] = data;
+        for (int i = 0; i < size - 1; i++)
+            p_vector[i] = p_new[i];
+        delete[] p_new;
+        p_vector[size - 1] = data;
+    }
+    else {
+        p_vector[size - 1] = data;
+    }
 }
 
 
@@ -43,23 +52,24 @@ template <typename T>
 void CVector<T> ::erase(size_t index) {
     T* p_new = p_vector;
     size = size - 1;
-    p_vector = new T[size];
+    p_vector = new T[total_size];
 
     for (size_t i = 0; i < index; i++)
         p_vector[i] = p_new[i];
 
     for (size_t i = index; i < size; i++)
         p_vector[i] = p_new[i + 1];
-
+    delete[] p_new;
 }
 
 template <typename T>
 CVector<T>::CVector(size_t s)
 {
     size = s;
+    total_size = s;
     p_vector = new T[s];
+    
 }
-
 
 template <typename T>
 CVector<T>::CVector(CVector& obj)
@@ -69,8 +79,8 @@ CVector<T>::CVector(CVector& obj)
 
     for (int i = 0; i < size; i++)
         p_vector[i] = obj.p_vector[i];
+    
 }
-
 
 
 template <typename T>
@@ -87,9 +97,8 @@ T& CVector<T>::operator[](int i)
 template <typename T>
 CVector<T>& CVector<T>::operator=(const CVector<T>& obj)
 {
-    // ≈сли размеры векторов не совпадают, то
-    // выдел€етс€ пам€ть нужного размера
-    if (size != obj.size) {
+
+    if (total_size < obj.size) {
         delete[] p_vector;
         p_vector = new T[obj.size];
         size = obj.size;
@@ -100,10 +109,6 @@ CVector<T>& CVector<T>::operator=(const CVector<T>& obj)
 
     return *this;
 }
-
-
-
-
 
 template<typename T>
 void run(std::ifstream& fin, std::ofstream& fout, int opers) {
@@ -213,3 +218,5 @@ int main() {
 
     return 0;
 };
+
+
