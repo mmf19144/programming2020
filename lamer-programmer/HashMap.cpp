@@ -288,9 +288,15 @@ public:
 			}
 			else
 			{
+				std::cout << arr[index]->first << std::endl;
 				if (arr[index]->first != key)
 				{
 					if (start_index == index)
+					{
+						return end();
+					}
+					// если прошли те элементы, для которых был нужный хеш, то всё.
+					if (get_index(arr[index]->first) != start_index)
 					{
 						return end();
 					}
