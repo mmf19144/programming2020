@@ -69,7 +69,9 @@ public:
         return head == nullptr;
     }
 };
+
 std::ifstream fin("input.txt");
+
 template<typename T>
 void start() {
 
@@ -89,14 +91,19 @@ void start() {
     }
     std::ofstream fout("output.txt");
     T sum;
+    bool is_first = true;
     size_t cnt_el = 0;
     while (!st.isEmpty()) {
-        sum += st.pop();
+        if (is_first) {
+            sum = st.pop();
+            is_first = false;
+        } else
+            sum += st.pop();
         cnt_el++;
     }
     fout << cnt_el;
     if (cnt_el) {
-        fout << " " << sum;
+        fout << " " << sum << endl;
     }
 
 }
