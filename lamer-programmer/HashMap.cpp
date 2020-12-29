@@ -6,7 +6,7 @@
 template<typename K, typename V>
 class HashMap
 {
-	std::pair<K, V> ** arr;
+	std::pair<K, V>** arr;
 	size_t current_size;
 	size_t capacity;
 	double percentage_of_occupancy;
@@ -22,15 +22,15 @@ class HashMap
 		{
 			temp_capacity = capacity * 2;
 		}
-		HashMap<K, V> temp{percentage_of_occupancy, temp_capacity};
-		for (const auto & element : *this)
+		HashMap<K, V> temp{ percentage_of_occupancy, temp_capacity };
+		for (const auto& element : *this)
 		{
 			temp.insert(element.first, element.second);
 		}
 		*this = temp;
 	}
 
-	size_t get_index(const K & key) const
+	size_t get_index(const K& key) const
 	{
 		std::hash<K> h;
 		return h(key) % capacity;
@@ -48,11 +48,11 @@ class HashMap
 
 public:
 	explicit HashMap(double percentage_of_occupancy)
-			: percentage_of_occupancy{percentage_of_occupancy}
-			, capacity{2}
-			, current_size{0}
+		: percentage_of_occupancy{ percentage_of_occupancy }
+		, capacity{ 2 }
+		, current_size{ 0 }
 	{
-		arr = new std::pair<K, V> * [capacity];
+		arr = new std::pair<K, V> *[capacity];
 		for (size_t i = 0; i < capacity; i++)
 		{
 			arr[i] = nullptr;
@@ -60,31 +60,32 @@ public:
 	}
 
 	HashMap(double percentage_of_occupancy, size_t start_size)
-			: percentage_of_occupancy{percentage_of_occupancy}
-			, capacity{start_size}
-			, current_size{0}
+		: percentage_of_occupancy{ percentage_of_occupancy }
+		, capacity{ start_size }
+		, current_size{ 0 }
 	{
-		arr = new std::pair<K, V> * [capacity];
+		arr = new std::pair<K, V> *[capacity];
 		for (size_t i = 0; i < capacity; i++)
 		{
 			arr[i] = nullptr;
 		}
 	}
 
-	HashMap(const HashMap<K, V> & other)
-			: percentage_of_occupancy{other.percentage_of_occupancy}
+	HashMap(const HashMap<K, V>& other)
+		: percentage_of_occupancy{ other.percentage_of_occupancy }
 	{
 		current_size = other.current_size;
 		capacity = other.capacity;
-		arr = new std::pair<K, V> * [capacity];
+		arr = new std::pair<K, V> *[capacity];
 		for (size_t i = 0; i < capacity; i++)
 		{
 			if (other.arr[i] == nullptr)
 			{
 				arr[i] = nullptr;
-			} else
+			}
+			else
 			{
-				arr[i] = new std::pair<K, V>{*(other.arr[i])};
+				arr[i] = new std::pair<K, V>{ *(other.arr[i]) };
 			}
 		}
 	}
@@ -98,7 +99,7 @@ public:
 		delete[] arr;
 	}
 
-	HashMap<K, V> & operator=(const HashMap<K, V> & other)
+	HashMap<K, V>& operator=(const HashMap<K, V>& other)
 	{
 		if (this == &other)
 		{
@@ -114,15 +115,16 @@ public:
 
 		current_size = other.current_size;
 		capacity = other.capacity;
-		arr = new std::pair<K, V> * [other.capacity];
+		arr = new std::pair<K, V> *[other.capacity];
 		for (size_t i = 0; i < capacity; i++)
 		{
 			if (other.arr[i] == nullptr)
 			{
 				arr[i] = nullptr;
-			} else
+			}
+			else
 			{
-				arr[i] = new std::pair<K, V>{*(other.arr[i])};
+				arr[i] = new std::pair<K, V>{ *(other.arr[i]) };
 			}
 		}
 		return *this;
@@ -132,76 +134,107 @@ public:
 	{
 		friend class HashMap;
 
-		std::pair<K, V> ** arr;
+		std::pair<K, V>** arr;
 		size_t capacity;
 		size_t index;
 
 	public:
 		iterator()
-				: arr{nullptr}
-				, capacity{0}
-				, index{0}
+			: arr{ nullptr }
+			, capacity{ 0 }
+			, index{ 0 }
 		{   }
 
-		iterator(std::pair<K, V> ** arr, size_t capacity, size_t index)
-				: arr{arr}
-				, capacity{capacity}
-				, index{index}
+		iterator(std::pair<K, V>** arr, size_t capacity, size_t index)
+			: arr{ arr }
+			, capacity{ capacity }
+			, index{ index }
 		{   }
 
-		iterator(const iterator & other)
-				: arr{other.arr}
-				, capacity{other.capacity}
-				, index{other.index}
+		iterator(const iterator& other)
+			: arr{ other.arr }
+			, capacity{ other.capacity }
+			, index{ other.index }
 		{   }
 
-		std::pair<K, V> & operator*() const
+		std::pair<K, V>& operator*() const
 		{
 			if (index == capacity)
 			{
-				throw std::out_of_range{"Разыменование итератора end()"};
+				throw std::out_of_range{ "Разыменование итератора end()" };
 			}
 			return *(arr[index]);
 		}
 
-		iterator & operator++()
+		iterator& operator++()
 		{
-			do
+			if (index == capacity)
+			{
+				throw std::out_of_range{ "HashMap::iterator::operator++() - выход за пределы таблицы" };
+			}
+			index++;
+			while (index != capacity)
+			{
+				if (arr[index] != nullptr)
+				{
+					break;
+				}
+				index++;
+			}
+
+
+			/*do
 			{
 
 				if (index == capacity)
 				{
-					throw std::out_of_range{"HashMap::iterator::operator++() - выход за пределы таблицы"};
+					throw std::out_of_range{ "HashMap::iterator::operator++() - выход за пределы таблицы" };
 				}
 				index++;
 				if (index == capacity)
 				{
-					continue;
+					throw std::out_of_range{ "HashMap::iterator::operator++() - выход за пределы таблицы" };
 				}
-			} while (arr[index] == nullptr);
+			} while (arr[index] == nullptr);*/
 			return *this;
 		}
 
 		const iterator operator++(int)
 		{
-			iterator temp{*this};
-			do
+			iterator temp{ *this };
+
+			if (index == capacity)
+			{
+				throw std::out_of_range{ "HashMap::iterator::operator++() - выход за пределы таблицы" };
+			}
+			index++;
+			while (index != capacity)
+			{
+				if (arr[index] != nullptr)
+				{
+					break;
+				}
+				index++;
+			}
+			
+			
+			/*do
 			{
 				if (index == capacity)
 				{
-					throw std::out_of_range{"HashMap::iterator::operator++(int) - выход за пределы таблицы"};
+					throw std::out_of_range{ "HashMap::iterator::operator++(int) - выход за пределы таблицы" };
 				}
 
 				index++;
 				if (index == capacity)
 				{
-					continue;
+					throw std::out_of_range{ "HashMap::iterator::operator++() - выход за пределы таблицы" };
 				}
-			} while (arr[index] == nullptr);
+			} while (arr[index] == nullptr);*/
 			return temp;
 		}
 
-		iterator & operator=(const iterator & other)
+		iterator& operator=(const iterator& other)
 		{
 			if (this == &other)
 			{
@@ -212,12 +245,12 @@ public:
 			index = other.index;
 		}
 
-		bool operator==(const iterator & other) const
+		bool operator==(const iterator& other) const
 		{
 			return index == other.index && arr == other.arr;
 		}
 
-		bool operator!=(const iterator & other) const
+		bool operator!=(const iterator& other) const
 		{
 			return index != other.index || arr != other.arr;
 		}
@@ -225,7 +258,7 @@ public:
 
 	iterator begin() const
 	{
-		HashMap::iterator temp{arr, capacity, 0};
+		HashMap::iterator temp{ arr, capacity, 0 };
 		if (arr[0] == nullptr)
 		{
 			temp++;
@@ -235,10 +268,10 @@ public:
 
 	iterator end() const
 	{
-		return HashMap::iterator{arr, capacity, capacity};
+		return HashMap::iterator{ arr, capacity, capacity };
 	}
 
-	iterator find(const K & key) const
+	iterator find(const K& key) const
 	{
 		size_t index = get_index(key);
 		size_t start_index = index;
@@ -270,7 +303,7 @@ public:
 		return iterator(arr, capacity, index);
 	}
 
-	void insert(const K & key, const V & value)
+	void insert(const K& key, const V& value)
 	{
 		if (double(current_size) / capacity >= percentage_of_occupancy || capacity == 0)
 		{
@@ -290,11 +323,11 @@ public:
 				index = 0;
 			}
 		}
-		arr[index] = new std::pair<K, V>{key, value};
+		arr[index] = new std::pair<K, V>{ key, value };
 		current_size++;
 	}
 
-	void erase(const K & key)
+	void erase(const K& key)
 	{
 		iterator it = find(key);
 
@@ -315,10 +348,10 @@ public:
 };
 
 template<typename K, typename V>
-size_t get_unique_count(HashMap<K, V> & hash_table)
+size_t get_unique_count(HashMap<K, V>& hash_table)
 {
-	HashMap<V, int> temp{0.8};
-	for (const auto & p : hash_table)
+	HashMap<V, int> temp{ 0.8 };
+	for (const auto& p : hash_table)
 	{
 		temp.insert(p.second, 0);
 	}
@@ -326,9 +359,9 @@ size_t get_unique_count(HashMap<K, V> & hash_table)
 }
 
 template<typename K, typename V>
-void foo2(std::ifstream & fin, std::ofstream & fout)
+void foo2(std::ifstream& fin, std::ofstream& fout)
 {
-	HashMap<K, V> hash_map{0.8};
+	HashMap<K, V> hash_map{ 0.8 };
 	size_t count_commands;
 	fin >> count_commands;
 
@@ -354,7 +387,7 @@ void foo2(std::ifstream & fin, std::ofstream & fout)
 }
 
 template<typename K>
-void foo1(std::ifstream & fin, std::ofstream & fout)
+void foo1(std::ifstream& fin, std::ofstream& fout)
 {
 	char type_value;
 	fin >> type_value;
@@ -375,8 +408,8 @@ void foo1(std::ifstream & fin, std::ofstream & fout)
 
 int main()
 {
-	std::ifstream fin{"input.txt"};
-	std::ofstream fout{"output.txt"};
+	std::ifstream fin{ "input.txt" };
+	std::ofstream fout{ "output.txt" };
 
 	char type_key;
 	fin >> type_key;
