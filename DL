@@ -1,0 +1,381 @@
+#include <cstring>
+#include <sstream>
+#include <iostream>
+#include <unordered_map>
+#include <queue>
+#include <utility>
+#include <fstream>
+#include <stack>
+#include <memory>
+
+using namespace std;
+
+
+class Exception {
+private:
+	string err;
+public:
+	Exception(string _err) : err(_err) {}
+	ofstream& printErr(ofstream& output_thread) {
+		output_thread << err << endl;
+		return output_thread;
+	}
+};
+
+
+class Expression {
+public:
+	virtual shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) = 0;
+	virtual int get_val() {
+		throw Exception("Type error, result isn't an value type");
+	}
+	virtual ~Expression() = default;
+};
+
+
+shared_ptr <Expression> find_exp(unordered_map <string, shared_ptr <Expression>>& env, string var) {
+	auto result = env.find(var);
+	if (result == env.end())
+		throw Exception("Undefined variable error");
+	else
+		return result->second;
+}
+
+
+class Variable : public Expression {
+private:
+	string var;
+public:
+	Variable(string _v) : var(_v) {}
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		return find_exp(env, var);
+	}
+};
+
+
+class Value : public Expression, public enable_shared_from_this<Value> {
+private:
+	int val;
+public:
+	Value(int _v) : val(_v) {}
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		return shared_from_this();
+	}
+	int get_val() {
+		return val;
+	}
+};
+
+
+class Add : public Expression {
+private:
+	shared_ptr <Expression> left = nullptr, right = nullptr;
+public:
+	Add(shared_ptr <Expression> _l, shared_ptr <Expression> _r) : left(_l), right(_r) {}
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		int left_sum = left->eval(env)->get_val();
+		int right_sum = right->eval(env)->get_val();
+		return make_shared<Value>(left_sum + right_sum);
+	}
+};
+
+
+class If : public Expression {
+private:
+	shared_ptr <Expression> left = nullptr,
+		right = nullptr,
+		then_exp = nullptr,
+		else_exp = nullptr;
+public:
+	If(shared_ptr <Expression> _l, shared_ptr <Expression> _r) : left(_l), right(_r) {}
+	void set_then(shared_ptr <Expression> _t) { then_exp = _t; }
+	void set_else(shared_ptr <Expression> _e) { else_exp = _e; }
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		int left_sum = left->eval(env)->get_val();
+		int right_sum = right->eval(env)->get_val();
+		if (left_sum > right_sum) {
+			return then_exp->eval(env);
+		}
+		else {
+			return else_exp->eval(env);
+		}
+	}
+};
+
+
+class Function : public Expression, public enable_shared_from_this<Function> {
+private:
+	string arg;
+	string func_name;
+	shared_ptr <Expression> action;
+	friend class Let;
+public:
+	Function(string _a, shared_ptr <Expression> _ac) : arg(_a), action(_ac) {}
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		return shared_from_this();
+	}
+	shared_ptr <Expression> eval(shared_ptr <Expression> arg_val, unordered_map <string, shared_ptr <Expression>>& env) {
+		env[arg] = arg_val;
+		return action->eval(env);
+	}
+};
+
+
+class Let : public Expression {
+private:
+	string var;
+	shared_ptr <Expression> value, body;
+public:
+	Let(string _v) : var(_v) {}
+	void set_value(shared_ptr <Expression> _value) { value = _value; }
+	void set_body(shared_ptr <Expression> _body) { body = _body; }
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		env[var] = value->eval(env);
+		return body->eval(env);
+	}
+};
+
+
+class Call : public Expression, public enable_shared_from_this<Call> {
+private:
+	shared_ptr <Expression> func, arg;
+public:
+	Call(shared_ptr <Expression> _f, shared_ptr <Expression> _a) : func(_f), arg(_a) {}
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		shared_ptr <Function> call_func = dynamic_pointer_cast<Function>(func->eval(env));
+		if (call_func == nullptr) {
+			throw Exception("Type error");
+		}
+		return call_func->eval(arg->eval(env), env);
+	}
+};
+
+
+class Array : public Expression {
+private:
+	vector<shared_ptr <Expression>> arr;
+public:
+	Array() {}
+	void add(shared_ptr <Expression> new_exp) {
+		arr.push_back(new_exp);
+	}
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		shared_ptr <Array> result = make_shared<Array>();
+		for (auto iter : arr) {
+			result->arr.push_back(iter->eval(env));
+		}
+		return result;
+	}
+	shared_ptr <Expression> get_elem(int index) const {
+		return arr[index];
+	}
+	int get_size() {
+		return arr.size();
+	}
+	void print(ofstream& fout) {
+		fout << "(arr";
+		for (auto iter : arr) {
+			fout << " (val ";
+			fout << iter->get_val();
+			fout << ")";
+		}
+		fout << ")" << endl;
+	}
+};
+
+
+class Gen : public Expression {
+private:
+	shared_ptr <Expression> length, func;
+public:
+	Gen(shared_ptr <Expression> _l, shared_ptr <Expression> _f) : length(_l), func(_f) {}
+
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		int len = length->eval(env)->get_val();
+		if (len < 0) {
+			throw Exception("Bad argument error");
+		}
+		else {
+			shared_ptr <Array> gen_arr = make_shared <Array>();
+			for (int i = 0; i < len; i++) {
+				shared_ptr <Value> curr_index = make_shared<Value>(i);
+				shared_ptr <Call> curr_call = make_shared<Call>(curr_index, func);
+				gen_arr->add(curr_call->eval(env));
+			}
+			return gen_arr;
+		}
+	}
+};
+
+
+class At : public Expression {
+private:
+	shared_ptr <Expression> arr, index;
+public:
+
+	At(shared_ptr <Expression> _a, shared_ptr <Expression> _ind) : arr(_a), index(_ind) {}
+
+	shared_ptr <Expression> eval(unordered_map <string, shared_ptr <Expression>>& env) {
+		shared_ptr<Array> ptr = dynamic_pointer_cast<Array>(arr->eval(env));
+		if (ptr == nullptr) {
+			throw Exception("Type error");
+		}
+		int index_val = index->eval(env)->get_val();
+
+		if (index_val < 0 || index_val >= ptr->get_size())
+			throw Exception("Index out of range error");
+
+		return ptr->get_elem(index_val);
+	}
+};
+
+
+
+queue <string> parsed_commands;
+
+
+shared_ptr <Expression> get_expression() {
+	shared_ptr <Expression> result = nullptr;
+
+	while (!parsed_commands.empty()) {
+		string curr_command = parsed_commands.front();
+		parsed_commands.pop();
+
+		if (curr_command == "(")
+		{
+			return get_expression();
+		}
+		else if (curr_command == ")")
+		{
+			return result;
+		}
+		else if (curr_command == "val")
+		{
+			result = make_shared<Value>(stoi(parsed_commands.front()));
+			parsed_commands.pop();
+		}
+		else if (curr_command == "var")
+		{
+			result = make_shared<Variable>(parsed_commands.front());
+			parsed_commands.pop();
+		}
+		else if (curr_command == "add")
+		{
+			shared_ptr <Expression> left = get_expression();
+			shared_ptr <Expression> right = get_expression();
+			result = make_shared<Add>(left, right);
+		}
+		else if (curr_command == "if")
+		{
+			shared_ptr <Expression> left = get_expression();
+			shared_ptr <Expression> right = get_expression();
+			shared_ptr <If> exp = make_shared<If>(left, right);
+			if (parsed_commands.front() != "then")
+				throw Exception("Syntax error");
+			parsed_commands.pop();
+			exp->set_then(get_expression());
+			if (parsed_commands.front() != "else")
+				throw Exception("Syntax error");
+			parsed_commands.pop();
+			exp->set_else(get_expression());
+			result = exp;
+		}
+		else if (curr_command == "let")
+		{
+			shared_ptr <Let> exp = make_shared<Let>(parsed_commands.front());
+			parsed_commands.pop();
+			if (parsed_commands.front() != "=")
+				throw Exception("Syntax error");
+			parsed_commands.pop();
+			exp->set_value(get_expression());
+			if (parsed_commands.front() != "in")
+				throw Exception("Syntax error");
+			parsed_commands.pop();
+			exp->set_body(get_expression());
+			result = exp;
+		}
+		else if (curr_command == "function")
+		{
+			string t = parsed_commands.front();
+			parsed_commands.pop();
+			result = make_shared<Function>(t, get_expression());
+		}
+		else if (curr_command == "call")
+		{
+			shared_ptr <Expression> left = get_expression();
+			shared_ptr <Expression> right = get_expression();
+			result = make_shared<Call>(left, right);
+		}
+		else if (curr_command == "arr")
+		{
+			shared_ptr <Array> arr = make_shared<Array>();
+			while (parsed_commands.front() != ")") {
+				arr->add(get_expression());
+			}
+			result = arr;
+		}
+		else if (curr_command == "gen")
+		{
+			shared_ptr <Expression> left = get_expression();
+			shared_ptr <Expression> right = get_expression();
+			result = make_shared<Gen>(left, right);
+		}
+		else if (curr_command == "at")
+		{
+			shared_ptr <Expression> left = get_expression();
+			shared_ptr <Expression> right = get_expression();
+			result = make_shared<At>(left, right);
+		}
+	}
+}
+
+
+int main()
+{
+	ifstream fin("input.txt");
+	ofstream fout("output.txt");
+
+	try {
+		string str_for_reading, temp_str;
+
+		while (fin >> temp_str) {
+			str_for_reading = str_for_reading + temp_str + " ";
+		}
+
+		for (int i = 0; i < str_for_reading.length(); i++) {
+			if (str_for_reading[i] == '(') {
+				str_for_reading.insert(i + 1, " ");
+			}
+			else if (str_for_reading[i] == ')') {
+				str_for_reading.insert(i, " ");
+				i++;
+			}
+		}
+
+		stringstream good_input(str_for_reading);
+
+		while (good_input >> temp_str) {
+			parsed_commands.push(temp_str);
+		}
+
+		str_for_reading = "";
+
+		temp_str = "";
+
+		shared_ptr <Expression> programm = get_expression();
+
+		unordered_map <string, shared_ptr <Expression>> env;
+		shared_ptr <Expression> result = programm->eval(env);
+
+		if (dynamic_pointer_cast<Value>(result) != nullptr) {
+			fout << "(val " << (dynamic_pointer_cast<Value>(result))->get_val() << ")" << endl;
+		}
+		else if (dynamic_pointer_cast<Array>(result) != nullptr) {
+			(dynamic_pointer_cast<Array>(result))->print(fout);
+		}
+	}
+	catch (...) {
+		fout << "ERROR" << endl;
+	}
+	return 0;
+}
