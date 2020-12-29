@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <stack>
+#include <memory>
 #include <exception>
 
 using namespace std;
@@ -29,10 +30,10 @@ public:
     virtual ~Token() = default;
 };
 
-class TokenWithOpenBracket: public Token {};
-class TokenWithCloseBracket: public Token {};
-class TokenAssignOperator: public Token {};
-class TokenKeyword: public Token {
+class TokenWithOpenBracket : public Token {};
+class TokenWithCloseBracket : public Token {};
+class TokenAssignOperator : public Token {};
+class TokenKeyword : public Token {
 
 public:
     TokenKeyword(const TokenKeyword& keyword) : keyword(keyword.keyword) {}
@@ -89,7 +90,7 @@ class Tokenizer {
 public:
     Tokenizer(vector<string>& keywords, istream& in) : in(in), keywords(keywords), state(TokenizerState::TokenWait) {};
 
-    list<Token*> Tokenize() {
+    list<shared_ptr <Token>> Tokenize() {
         while (!in.eof() && in.peek() >= 0) {
             switch (state) {
             case TokenizerState::TokenWait:
@@ -104,7 +105,7 @@ public:
         }
 
         if (state == TokenizerState::IntRead && buff.length())
-            tokens.push_back((Token*)TokenCreateValue());
+            tokens.push_back((shared_ptr <Token>)TokenCreateValue());
 
         if (state == TokenizerState::ReadWord && buff.length())
             tokens.push_back(TokenCreateWord());
@@ -121,7 +122,7 @@ protected:
             return;
         }
 
-        Token* token = TokenCreateValue();
+        shared_ptr <Token> token = TokenCreateValue();
         tokens.push_back(token);
         in.putback(ch);
         state = TokenizerState::TokenWait;
@@ -136,7 +137,7 @@ protected:
             return;
         }
 
-        Token* token = TokenCreateWord();
+        shared_ptr <Token> token = TokenCreateWord();
         tokens.push_back(token);
         in.putback(ch);
         state = TokenizerState::TokenWait;
@@ -157,17 +158,17 @@ protected:
         }
 
         if (ch == BRACKET_OPEN) {
-            tokens.push_back((Token*)(new TokenWithOpenBracket()));
+            tokens.push_back((shared_ptr <Token>)(new TokenWithOpenBracket()));
             return;
         }
 
         if (ch == BRACKET_CLOSE) {
-            tokens.push_back((Token*)(new TokenWithCloseBracket()));
+            tokens.push_back((shared_ptr <Token>)(new TokenWithCloseBracket()));
             return;
         }
 
         if (ch == ASSIGN_OPERATOR) {
-            tokens.push_back((Token*)(new TokenAssignOperator()));
+            tokens.push_back((shared_ptr <Token>)(new TokenAssignOperator()));
             return;
         }
 
@@ -175,23 +176,24 @@ protected:
 
     }
 
-    ValueToken* TokenCreateValue() {
-        ValueToken* token = new ValueToken(stoi(buff));
+    shared_ptr <Token> TokenCreateValue() {
+        shared_ptr <Token> token = make_shared <ValueToken>(stoi(buff)); //вопрос
         buff = "";
         return token;
     }
-    Token* TokenCreateWord() {
+
+    shared_ptr <Token> TokenCreateWord() {
         bool isKeyword = find(keywords.begin(), keywords.end(), buff) != keywords.end();
-        Token* token = isKeyword
-            ? (Token*) new TokenKeyword(buff)
-            : (Token*) new IdentifierToken(buff);
+        shared_ptr <Token> token = isKeyword
+            ? (shared_ptr <Token>) new TokenKeyword(buff)
+            : (shared_ptr <Token>) new IdentifierToken(buff);
         buff = "";
         return token;
     }
 private:
     vector<string>& keywords;
     istream& in;
-    list<Token*> tokens;
+    list<shared_ptr <Token>> tokens;
     TokenizerState state;
     string buff;
 };
@@ -202,9 +204,6 @@ class Expression {
 public:
     Expression() {}
     virtual ~Expression() = default;
-    virtual Expression* Clone() {
-        return new Expression();
-    }
     virtual string ToString() {
         return "(expr)";
     }
@@ -216,9 +215,7 @@ public:
     int GetValue() const {
         return value;
     }
-    virtual Expression* Clone() {
-        return (Expression*) new Valexpression(value);
-    }
+
     virtual string ToString() {
         return "(val " + to_string(value) + ")";
     }
@@ -233,9 +230,6 @@ public:
         return id;
     }
 
-    Expression* Clone() override {
-        return (Expression*) new VarExpression(id);
-    }
 
     string ToString() override {
         return "(var " + id + ")";
@@ -247,67 +241,44 @@ private:
 
 class AddExpression : public Expression { //add
 public:
-    AddExpression(Expression* left, Expression* right) : l(left), r(right) {};
+    AddExpression(shared_ptr <Expression> left, shared_ptr <Expression> right) : l(left), r(right) {};
 
-    ~AddExpression() {
-        delete l; delete r;
-    }
-
-    Expression* GetLeftOperand() const {
+    shared_ptr <Expression> GetLeftOperand() const {
         return l;
     }
 
-    Expression* GetRightOperand() const {
+    shared_ptr <Expression> GetRightOperand() const {
         return r;
-    }
-
-    virtual Expression* Clone() {
-        return (Expression*) new AddExpression(l->Clone(), r->Clone());
     }
 
     virtual string ToString() {
         return "(add " + l->ToString() + " " + r->ToString() + ")";
     }
 private:
-    Expression* l;
-    Expression* r;
+    shared_ptr <Expression> l;
+    shared_ptr <Expression> r;
 };
 
 class IfExpression : public Expression { //if
 public:
-    IfExpression(Expression* left, Expression* right, Expression* thenBranch, Expression* elseBranch) :
+    IfExpression(shared_ptr <Expression> left, shared_ptr <Expression> right, shared_ptr <Expression> thenBranch, shared_ptr <Expression> elseBranch) :
         l(left), r(right), Branchthen(thenBranch), Branchelse(elseBranch) {};
 
-    ~IfExpression() {
-        delete l;
-        delete r;
-        delete Branchthen;
-        delete Branchelse;
-    }
 
-    Expression* GetLeftOperand() const {
+    shared_ptr <Expression> GetLeftOperand() const {
         return l;
     }
 
-    Expression* GetRightOperand() const {
+    shared_ptr <Expression> GetRightOperand() const {
         return r;
     }
 
-    Expression* GetThenBranch() const {
+    shared_ptr <Expression> GetThenBranch() const {
         return Branchthen;
     }
 
-    Expression* GetElseBranch() const {
+    shared_ptr <Expression> GetElseBranch() const {
         return Branchelse;
-    }
-
-    Expression* Clone() override {
-        return (Expression*)new IfExpression(
-            l->Clone(),
-            r->Clone(),
-            Branchthen->Clone(),
-            Branchelse->Clone()
-        );
     }
 
     string ToString() override {
@@ -315,83 +286,28 @@ public:
     }
 
 private:
-    Expression* l;
-    Expression* r;
-    Expression* Branchthen;
-    Expression* Branchelse;
+    shared_ptr <Expression> l;
+    shared_ptr <Expression> r;
+    shared_ptr <Expression> Branchthen;
+    shared_ptr <Expression> Branchelse;
 };
-/*
-class IfExpression : public Expression { //if
-public:
-    IfExpression(Expression* left, Expression* right, Expression* thenBranch, Expression* elseBranch) :
-        l(left), r(right), Branchthen(thenBranch), Branchelse(elseBranch) {};
-
-    ~IfExpression() {
-        delete l;
-        delete r;
-        delete Branchthen;
-        delete Branchelse;
-    }
-
-    Expression* GetLeftOperand() const {
-        return l;
-    }
-
-    Expression* GetRightOperand() const {
-        return r;
-    }
-
-    Expression* GetThenBranch() const {
-        return Branchthen;
-    }
-
-    Expression* GetElseBranch() const {
-        return Branchelse;
-    }
-
-    Expression* Clone() override {
-        return (Expression*)new IfExpression(
-            l->Clone(),
-            r->Clone(),
-            Branchthen->Clone(),
-            Branchelse->Clone()
-        );
-    }
-
-    string ToString() override {
-        return "(if " + l->ToString() + " " + r->ToString() + " then " + Branchthen->ToString() + " else " + Branchelse->ToString() + ")";
-    }
-
-private:
-    Expression* l;
-    Expression* r;
-    Expression* Branchthen;
-    Expression* Branchelse;
-};*/
 
 class LetExpression : public Expression { //let
 public:
-    LetExpression(const string& id, Expression* expression, Expression* body) :
+    LetExpression(const string& id, shared_ptr <Expression> expression, shared_ptr <Expression> body) :
         id(id), expression(expression), body(body) {};
-    ~LetExpression() {
-        delete expression;
-        delete body;
-    }
+
 
     string GetingId() const {
         return id;
     }
 
-    Expression* GetingExpression() const {
+    shared_ptr <Expression> GetingExpression() const {
         return expression;
     }
 
-    Expression* GetingBody() const {
+    shared_ptr <Expression> GetingBody() const {
         return body;
-    }
-
-    Expression* Clone() override {
-        return (Expression*)new LetExpression(id, expression->Clone(), body->Clone());
     }
 
     string ToString() override {
@@ -400,35 +316,20 @@ public:
 
 private:
     string id;
-    Expression* expression;
-    Expression* body;
+    shared_ptr <Expression> expression;
+    shared_ptr <Expression> body;
 };
 
 
 class BlockExpression : public Expression { //block
 public:
-    void AddExpression(Expression* expression) {
+    void AddExpression(shared_ptr <Expression> expression) {
         expressions.push_back(expression);
     }
 
-    ~BlockExpression() {
-        auto it = expressions.begin();
-        while (it != expressions.end()) {
-            delete* it;
-            it++;
-        }
-    }
 
-    list<Expression*> GetExpressions() const {
+    list<shared_ptr <Expression>> GetExpressions() const {
         return expressions;
-    }
-
-    Expression* Clone() override {
-        auto block = new BlockExpression();
-        for (auto p : expressions) {
-            block->AddExpression(p->Clone());
-        }
-        return (Expression*)block;
     }
 
     string ToString() override {
@@ -440,28 +341,22 @@ public:
     }
 
 private:
-    list<Expression*> expressions;
+    list<shared_ptr <Expression>> expressions;
 };
 
 class FunctionExpression : public Expression { //func
 public:
-    FunctionExpression(const string& id, Expression* body) : id(id), body(body) {};
-
-    ~FunctionExpression() {
-        delete body;
-    }
+    FunctionExpression(const string& id, shared_ptr <Expression> body) : id(id), body(body) {};
 
     string GetingId() const {
         return id;
     }
 
-    Expression* GetingBody() const {
+    shared_ptr <Expression> GetingBody() const {
         return body;
     }
 
-    Expression* Clone() override {
-        return (Expression*) new FunctionExpression(id, body->Clone());
-    }
+
 
     string ToString() override {
         return "(function " + id + " " + body->ToString() + ")";
@@ -469,27 +364,19 @@ public:
 
 private:
     string id;
-    Expression* body;
+    shared_ptr <Expression> body;
 };
 
 class CallExpression : public Expression { //call
 public:
-    CallExpression(Expression* callable, Expression* argument) : call(callable), arg(argument) {};
+    CallExpression(shared_ptr <Expression> callable, shared_ptr <Expression> argument) : call(callable), arg(argument) {};
 
-    ~CallExpression() {
-        delete call; delete arg;
-    }
-
-    Expression* GetingCall() const {
+    shared_ptr <Expression> GetingCall() const {
         return call;
     }
 
-    Expression* GetingArg() const {
+    shared_ptr <Expression> GetingArg() const {
         return arg;
-    }
-
-    Expression* Clone() override {
-        return (Expression*) new CallExpression(call->Clone(), arg->Clone());
     }
 
     string ToString() override {
@@ -497,29 +384,22 @@ public:
     }
 
 private:
-    Expression* call;
-    Expression* arg;
+    shared_ptr <Expression> call;
+    shared_ptr <Expression> arg;
 };
 
 class SetExpression : public Expression { //set
 public:
 
-    SetExpression(const string& id, Expression* expression) :
+    SetExpression(const string& id, shared_ptr <Expression> expression) :
         id(id), expression(expression) {};
-    ~SetExpression() {
-        delete expression;
-    }
 
     string GetingId() const {
         return id;
     }
 
-    Expression* GetExpression() const {
+    shared_ptr <Expression> GetExpression() const {
         return expression;
-    }
-
-    Expression* Clone() override {
-        return (Expression*) new SetExpression(id, expression->Clone());
     }
 
     string ToString() override {
@@ -528,48 +408,48 @@ public:
 
 private:
     string id;
-    Expression* expression;
+    shared_ptr <Expression> expression;
 };
 
 
 
 class Parser {
 public:
-    Parser(list<Token*>& tokens) {
+    Parser(list<shared_ptr <Token>>& tokens) {
         it = tokens.begin();
         end = tokens.end();
     }
 
-    Expression* Parse() {
+    shared_ptr <Expression> Parse() {
         return ParseExpression();
     }
 
     //Recursive parser
-    Expression* ParseExpression() {
+    shared_ptr <Expression> ParseExpression() {
         static_cast<void>(GetingToken<TokenWithOpenBracket>());
         auto keyword = GetingToken<TokenKeyword>();
-        Expression* expression = nullptr;
+        shared_ptr <Expression> expression = nullptr;
 
         const string& str = keyword->GetKeyword();
-// all cases
+        // all cases
         if (str == "block")
-            expression = (Expression*)ParseBlockExpression();
+            expression = (shared_ptr <Expression>)ParseBlockExpression();
         else if (str == "val")
-            expression = (Expression*)ParseValExpression();
+            expression = (shared_ptr <Expression>)ParseValExpression();
         else if (str == "let")
-            expression = (Expression*)ParseLetExpression();
+            expression = (shared_ptr <Expression>)ParseLetExpression();
         else if (str == "var")
-            expression = (Expression*)ParseVarExpression();
+            expression = (shared_ptr <Expression>)ParseVarExpression();
         else if (str == "add")
-            expression = (Expression*)ParseAddExpression();
+            expression = (shared_ptr <Expression>)ParseAddExpression();
         else if (str == "if")
-            expression = (Expression*)ParseIfxpression();
+            expression = (shared_ptr <Expression>)ParseIfxpression();
         else if (str == "function")
-            expression = (Expression*)ParseFunctionExpression();
+            expression = (shared_ptr <Expression>)ParseFunctionExpression();
         else if (str == "call")
-            expression = (Expression*)ParseCallExpression();
+            expression = (shared_ptr <Expression>)ParseCallExpression();
         else if (str == "set")
-            expression = (Expression*)ParseSetExpression();
+            expression = (shared_ptr <Expression>)ParseSetExpression();
 
         static_cast<void>(GetingToken<TokenWithCloseBracket>());
         return expression;
@@ -577,21 +457,21 @@ public:
 
 protected:
     template<class T>
-    T* GetingToken() {
+    shared_ptr <T> GetingToken() {
         auto token = NextToken();
-        T* t = dynamic_cast<T*>(token);
+        shared_ptr <T> t = dynamic_pointer_cast<T>(token);
         if (t) return t;
         throw MyException("Unexpected token");
     }
 
-    TokenKeyword* GetKeyword(const string& str) {
+    shared_ptr <TokenKeyword> GetKeyword(const string& str) {
         auto token = GetingToken<TokenKeyword>();
 
         if (token->GetKeyword() != str) throw MyException("keyword is unexpected");
         return token;
     }
 
-    Token* NextToken() {
+    shared_ptr <Token> NextToken() {
         if (it != end) {
             auto token = *it;
             it++;
@@ -600,98 +480,88 @@ protected:
         throw MyException("end of file maybe unexpected");
     }
 
-    /*
-        Token* NextToken() {
-        if (it != end) {
-            auto token = *it;
-            it++;
-            return token;
-        }
-        throw MyException("end of file maybe unexpected");
-    }*/
-
-    Valexpression* ParseValExpression() {
+    shared_ptr <Valexpression> ParseValExpression() {
         auto valueToken = GetingToken<ValueToken>();
         int value = valueToken->GetValue();
-        return new Valexpression(value);
+        return make_shared<Valexpression>(value);
     }
 
-    BlockExpression* ParseBlockExpression() {
-        BlockExpression* expr = new BlockExpression();
+    shared_ptr <BlockExpression> ParseBlockExpression() {
+        shared_ptr <BlockExpression> expr = make_shared <BlockExpression>();
         do {
             auto token = NextToken();
-            auto closeBracket = dynamic_cast<TokenWithCloseBracket*>(token);
+            auto closeBracket = dynamic_pointer_cast<TokenWithCloseBracket>(token);
             it--;
             if (closeBracket) {
                 break;
             }
             else {
-                Expression* nestedExpression = ParseExpression();
+                shared_ptr <Expression> nestedExpression = ParseExpression();
                 expr->AddExpression(nestedExpression);
             }
 
         } while (true);
 
-        if (expr->GetExpressions().size() == 0) {
-            delete expr;
-            throw MyException("Block epxression must have expression that nested");
-        }
+ //       if (expr->GetExpressions().size() == 0) {
+ //           delete expr;
+ //           throw MyException("Block epxression must have expression that nested");
+ //       }
         return expr;
     }
 
-    LetExpression* ParseLetExpression() {
+    shared_ptr <LetExpression> ParseLetExpression() {
         auto id = GetingToken<IdentifierToken>();
         static_cast<void>(GetingToken<TokenAssignOperator>());
 
         auto expression = ParseExpression();
         static_cast<void>(GetKeyword("in"));
         auto body = ParseExpression();
-        return new LetExpression(id->GetingId(), expression, body);
+        return make_shared <LetExpression>(id->GetingId(), expression, body);
     }
 
-    VarExpression* ParseVarExpression() {
+    shared_ptr <VarExpression> ParseVarExpression() {
         auto token = GetingToken<IdentifierToken>();
-        return new VarExpression(token->GetingId());
+        return make_shared <VarExpression>(token->GetingId());
     }
 
-    AddExpression* ParseAddExpression() {
+    shared_ptr <AddExpression> ParseAddExpression() {
         auto l = ParseExpression();
         auto r = ParseExpression();
-        return new AddExpression(l, r);
+        return make_shared <AddExpression>(l, r);
     }
 
-    IfExpression* ParseIfxpression() {
+    shared_ptr <IfExpression> ParseIfxpression() {
         auto l = ParseExpression();
         auto r = ParseExpression();
         static_cast<void>(GetKeyword("then"));
         auto trueBranch = ParseExpression();
         static_cast<void>(GetKeyword("else"));
         auto elseBranch = ParseExpression();
-        return new IfExpression(l, r, trueBranch, elseBranch);
+        return make_shared <IfExpression>(l, r, trueBranch, elseBranch);
     }
 
-    FunctionExpression* ParseFunctionExpression() {
+    shared_ptr <FunctionExpression> ParseFunctionExpression() {
         auto id = GetingToken<IdentifierToken>();
         auto body = ParseExpression();
-        return new FunctionExpression(id->GetingId(), body);
+        return make_shared <FunctionExpression>(id->GetingId(), body);
     }
 
-    CallExpression* ParseCallExpression() {
+    shared_ptr <CallExpression> ParseCallExpression() {
         auto function = ParseExpression();
         auto argument = ParseExpression();
-        return new CallExpression(function, argument);
+        return make_shared <CallExpression>(function, argument);
     }
 
-    SetExpression* ParseSetExpression() {
+    shared_ptr <SetExpression> ParseSetExpression() {
         auto id = GetingToken<IdentifierToken>();
         auto val = ParseExpression();
-        return new SetExpression(id->GetingId(), val);
+        return make_shared <SetExpression>(id->GetingId(), val);
     }
 
 private:
-    list<Token*> tokens;
-    list<Token*>::iterator it;
-    list<Token*>::iterator end;
+    list<shared_ptr <Token>> tokens;
+    list<shared_ptr <Token>>::iterator it;
+    list<shared_ptr <Token>>::iterator end;
 };
 
 // Scope add task
@@ -699,28 +569,29 @@ class Scope {
 public:
     Scope() = default;
 
-    Scope(Scope* parent) : parentScope(parent) {}
-    ~Scope() {
-        for (auto p : values) {
-            auto expr = p.second;
-            if (expr) delete expr;
-        }
-    }
-    const Expression* GetValue(const string& key) {
+    Scope(shared_ptr <Scope> parent) : parentScope(parent) {}
+
+//    ~Scope() {
+//        for (auto p : values) {
+//            auto expr = p.second;
+//            if (expr) delete expr;
+//        }
+//    }
+    const shared_ptr <Expression> GetValue(const string& key) {
         return values.at(key);
     }
 
-    void AddValue(const string& key, Expression* value) {
-        
+    void AddValue(const string& key, shared_ptr <Expression> value) {
+
         values.insert({ key,value });
     }
 
-    void SetValue(const string& key, Expression* value) {
+    void SetValue(const string& key, shared_ptr <Expression> value) {
         static_cast<void>(values.at(key));
         values[key] = value;
     }
 
-    bool TryGet(const string& key, Expression** value) {
+    bool TryGet(const string& key, shared_ptr <Expression>* value) {
         if (values.count(key)) {
             *value = values.at(key);
             return true;
@@ -728,194 +599,186 @@ public:
         return false;
     }
 
-    bool TrySet(const string& key, Expression* value) {
+    bool TrySet(const string& key, shared_ptr <Expression> value) {
         if (values.count(key)) {
             values[key] = value;
             return true;
         }
         return false;
     }
-    Scope* GetParent() {
+    shared_ptr <Scope> GetParent() {
         return parentScope;
     }
 
 private:
-    Scope* parentScope = nullptr;
-    unordered_map<string, Expression*> values;
+    shared_ptr <Scope> parentScope = nullptr;
+    unordered_map<string, shared_ptr <Expression>> values;
 };
 
 //Scope Closure add task
 class ClosureExpression : public FunctionExpression {
-public:
-    ClosureExpression(FunctionExpression* func, Scope* scope)
-        : FunctionExpression(func->GetingId(), func->GetingBody()->Clone()), scope(scope) {}
+private:
+    shared_ptr <Scope> scope;
 
-    Scope* GetScope() {
+public:
+    ClosureExpression(shared_ptr <FunctionExpression> func, shared_ptr <Scope> scope) //вопрос
+        : FunctionExpression(func->GetingId(), func->GetingBody()), scope(scope) {}
+
+    shared_ptr <Scope> GetScope() {
         return scope;
     }
 
-private:
-    Scope* scope;
 };
 
 class VM {
-public:
-    VM() {
-        scopeStack.push(new Scope());
-    }
-    ~VM() {
-        delete PopScope();
-    }
-
-    Expression* Eval(Expression* expression) { //func for all types
-        if (auto valExpr = dynamic_cast<Valexpression*>(expression))
-            return (Expression*)Eval(valExpr);
-
-        if (auto varExpr = dynamic_cast<VarExpression*>(expression))
-            return Eval(varExpr);
-
-        if (auto addExpr = dynamic_cast<AddExpression*>(expression))
-            return (Expression*)Eval(addExpr);
-
-        if (auto ifExpr = dynamic_cast<IfExpression*>(expression))
-            return Eval(ifExpr);
-
-        if (auto letExpr = dynamic_cast<LetExpression*>(expression))
-            return Eval(letExpr);
-
-        if (auto funcExpr = dynamic_cast<FunctionExpression*>(expression))
-            return (Expression*)Eval(funcExpr);
-
-        if (auto callExpr = dynamic_cast<CallExpression*>(expression))
-            return (Expression*)Eval(callExpr);
-
-        if (auto setExpr = dynamic_cast<SetExpression*>(expression))
-            return (Expression*)Eval(setExpr);
-
-        if (auto blockExpr = dynamic_cast<BlockExpression*>(expression))
-            return Eval(blockExpr);
-
-        throw MyException("Unknown expression type");
-    }
-
+private:
+    stack<shared_ptr <Scope>> scopeStack;
 protected:
-    Scope* CurrentScope() const {
+    shared_ptr <Scope> CurrentScope() const {
         return scopeStack.top();
     }
 
-    void PushScope(Scope* scope) {
+    void PushScope(shared_ptr <Scope> scope) {
         scopeStack.push(scope);
     }
 
-    Scope* PopScope() {
+    shared_ptr <Scope> PopScope() {
         auto res = scopeStack.top();
         scopeStack.pop();
         return res;
     }
 
-    static Valexpression* Eval(Valexpression* val) {
-        return (Valexpression*)val->Clone();
+    shared_ptr <Valexpression> Eval(shared_ptr <Valexpression> val) {
+        return (shared_ptr <Valexpression>)val;
     }
 
-    Expression* Eval(VarExpression* var) {
+    shared_ptr <Expression> Eval(shared_ptr <VarExpression> var) {
         auto id = var->GetId();
         return FromEnv(id);
     }
 
-    Valexpression* Eval(AddExpression* expr) {
+    shared_ptr <Valexpression> Eval(shared_ptr <AddExpression> expr) {
         auto lExpr = Eval(expr->GetLeftOperand());
         auto rExpr = Eval(expr->GetRightOperand());
-        return new Valexpression(GetValue(lExpr) + GetValue(rExpr));
+        return make_shared <Valexpression>(GetValue(lExpr) + GetValue(rExpr));
     }
 
-    Expression* Eval(IfExpression* expr) {
+    shared_ptr <Expression> Eval(shared_ptr <IfExpression> expr) {
         auto valLeft = GetValue(Eval(expr->GetLeftOperand()));
         auto valRight = GetValue(Eval(expr->GetRightOperand()));
         return Eval(valLeft > valRight ? expr->GetThenBranch() : expr->GetElseBranch());
     }
 
-    Expression* Eval(LetExpression* expr) {
+    shared_ptr <Expression> Eval(shared_ptr <LetExpression> expr) {
         auto id = expr->GetingId();
         auto value = Eval(expr->GetingExpression());
-        Scope* scope = new Scope(CurrentScope());
+        shared_ptr <Scope> scope = make_shared<Scope>(CurrentScope());
         PushScope(scope);
         scope->AddValue(id, value);
         auto result = Eval(expr->GetingBody());
-        delete PopScope();
         return result;
     }
 
-    ClosureExpression* Eval(FunctionExpression* func) {
-        return new ClosureExpression(func, CurrentScope());
+    shared_ptr <ClosureExpression> Eval(shared_ptr <FunctionExpression> func) {
+        return make_shared <ClosureExpression>(func, CurrentScope()); //вопрос
     }
 
-    Expression* Eval(CallExpression* expr) {
+    shared_ptr <Expression> Eval(shared_ptr <CallExpression> expr) {
         auto res = Eval(expr->GetingCall());
-        auto called = dynamic_cast<FunctionExpression*>(res);
+        auto called = dynamic_pointer_cast<FunctionExpression>(res);
         if (called == nullptr)
             throw MyException("Can't call not function expression");
-        auto closure = dynamic_cast<ClosureExpression*>(res);
+        auto closure = dynamic_pointer_cast<ClosureExpression>(res);
 
         auto argument = Eval(expr->GetingArg());
 
-        Scope* parentScope = closure ? closure->GetScope() : CurrentScope();
-        Scope* scope = new Scope(parentScope);
+        shared_ptr <Scope> parentScope = closure ? closure->GetScope() : CurrentScope();
+        shared_ptr <Scope> scope = make_shared<Scope>(parentScope);
         scope->AddValue(called->GetingId(), argument);
         PushScope(scope);
 
         auto result = Eval(called->GetingBody());
-        delete PopScope();
         return result;
     }
 
-    Expression* Eval(SetExpression* expr) {
+    shared_ptr <Expression> Eval(shared_ptr <SetExpression> expr) {
         auto id = expr->GetingId();
         auto value = Eval(expr->GetExpression());
         if (!TrySetInEnv(id, value)) {
             throw MyException("Variable doesn't exists " + id);
         }
-        return new Expression();
+        return make_shared<Expression>();
     }
 
-    Expression* Eval(BlockExpression* block) {
-        Expression* result = nullptr;
-        Scope* scope = new Scope(CurrentScope());
+    shared_ptr <Expression> Eval(shared_ptr <BlockExpression> block) {
+        shared_ptr <Expression> result = nullptr;
+        shared_ptr <Scope> scope = make_shared<Scope>(CurrentScope());
         PushScope(scope);
         for (auto expr : block->GetExpressions()) {
-            if (result) delete result;
             result = Eval(expr);
         }
-        delete PopScope();
         return result;
     }
 
-    static int GetValue(Expression* expression) { //function that returns match int if called from type val
-        
-        auto valExpression = dynamic_cast<Valexpression*>(expression);
+    static int GetValue(shared_ptr <Expression> expression) { //function that returns match int if called from type val
+
+        auto valExpression = dynamic_pointer_cast<Valexpression>(expression);
         if (valExpression) return valExpression->GetValue();
         throw MyException("Expression isn't value expression");
     }
 
-    Expression* FromEnv(string& key) { //function that returns expression matching the given id in env
-        Expression* expr = nullptr;
-        Scope* scope;
+    shared_ptr <Expression> FromEnv(string& key) { //function that returns expression matching the given id in env
+        shared_ptr <Expression> expr = nullptr;
+        shared_ptr <Scope> scope;
         for (scope = CurrentScope(); scope != nullptr; scope = scope->GetParent()) {
             if (scope->TryGet(key, &expr)) break;
         }
-        if (scope != nullptr) return expr->Clone();
+        if (scope != nullptr) return expr;
         throw MyException("Unknown key " + key);
     }
 
-    bool TrySetInEnv(string& key, Expression* expression) {
-        Scope* scope;
+    bool TrySetInEnv(string& key, shared_ptr <Expression> expression) {
+        shared_ptr <Scope> scope;
         for (scope = CurrentScope(); scope != nullptr; scope = scope->GetParent()) {
             if (scope->TrySet(key, expression)) return true;
         }
         return false;
     }
+public:
+    VM() {
+        scopeStack.push(make_shared<Scope>());
+    }
 
-private:
-    stack<Scope*> scopeStack;
+    shared_ptr <Expression> Eval(shared_ptr <Expression> expression) { //func for all types
+        if (auto valExpr = dynamic_pointer_cast<Valexpression>(expression))
+            return Eval(valExpr);
+
+        if (auto varExpr = dynamic_pointer_cast<VarExpression>(expression))
+            return Eval(varExpr);
+
+        if (auto addExpr = dynamic_pointer_cast<AddExpression>(expression))
+            return Eval(addExpr);
+
+        if (auto ifExpr = dynamic_pointer_cast <IfExpression>(expression))
+            return Eval(ifExpr);
+
+        if (auto letExpr = dynamic_pointer_cast <LetExpression>(expression))
+            return Eval(letExpr);
+
+        if (auto funcExpr = dynamic_pointer_cast <FunctionExpression>(expression))
+            return Eval(funcExpr);
+
+        if (auto callExpr = dynamic_pointer_cast <CallExpression>(expression))
+            return Eval(callExpr);
+
+        if (auto setExpr = dynamic_pointer_cast <SetExpression>(expression))
+            return Eval(setExpr);
+
+        if (auto blockExpr = dynamic_pointer_cast <BlockExpression>(expression))
+            return Eval(blockExpr);
+
+        throw MyException("Unknown expression type");
+    }
 };
 
 
@@ -938,18 +801,14 @@ int main() {
         VM vm;
         auto expression = vm.Eval(AST);
 
-        if (dynamic_cast<Valexpression*>(expression) == nullptr) {
-            throw MyException("Wrong expression type");
+        if (dynamic_pointer_cast<Valexpression>(expression) == nullptr) {
+            throw MyException("wrong expression type");
         }
         fout << expression->ToString();
-        delete AST;
-        delete expression;
-
-        for (auto i : tokens) {
-            delete i;
-        }
+        fout.close();
     }
     catch (MyException e) {
         fout << "ERROR";
+        fout.close();
     }
 }
