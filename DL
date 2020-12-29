@@ -692,8 +692,7 @@ protected:
 
         auto argument = Eval(expr->GetingArg());
 
-        shared_ptr <Scope> parentScope = closure ? closure->GetScope() : CurrentScope();
-        shared_ptr <Scope> scope = make_shared<Scope>(parentScope);
+        shared_ptr <Scope> scope = make_shared<Scope>(CurrentScope());
         scope->AddValue(called->GetingId(), argument);
         PushScope(scope);
 
@@ -721,7 +720,6 @@ protected:
     }
 
     static int GetValue(shared_ptr <Expression> expression) { //function that returns match int if called from type val
-
         auto valExpression = dynamic_pointer_cast<Valexpression>(expression);
         if (valExpression) return valExpression->GetValue();
         throw MyException("Expression isn't value expression");
@@ -806,9 +804,9 @@ int main() {
         }
         fout << expression->ToString();
         fout.close();
+
     }
     catch (MyException e) {
         fout << "ERROR";
-        fout.close();
     }
 }
