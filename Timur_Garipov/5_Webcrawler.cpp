@@ -1,30 +1,25 @@
-﻿#include <iostream>
+#include <iostream>
 #include <fstream>
 #include <vector>
 #include <mutex>
 #include <thread>
 #include <queue>
 #include <chrono>
-
+#include <regex>
 #include <map>
+#include <set>
 
-#define STORE "store/"
-#define PATH "test_data/"
+const std::string STORE = "store/";
+const std::string PATH = "test_data/";
+const std::regex regExpr("<a href=\"([^<]+)\">");
 using namespace std;
-
-int countThread;
-queue<string> q_Ref;
-map<string, bool> wasHere;
-map<std::thread::id, bool> threadMap;
-vector<thread*> Threads;
-mutex locker;
-vector<bool> isWorking;
-
 
 class Web_page {
 private:
+    mutex* locker;
+    queue<string>* queueRef;
     std::string content;
-    std::vector<std::string> ref;
+    std::set<std::string> ref;
     int getPosition(const std::string& str, const int& i1, char symb) {
         for (int i = i1; i < str.length(); i++) {
             if (str[i] == symb)
@@ -33,125 +28,113 @@ private:
         return i1;
     }
     void getReference() {
-        for (int i = 0; i < content.size(); i++) {
-            if (content[i] == '<' && i + 10 < content.size()) {
-                std::string token = content.substr(i + 1, getPosition(content, i + 1, '>') - 1);
-                if (token.length() > 0 && token[0] == 'a' && token.substr(2, 6) == "href=\"") {
-                    token = token.substr(8, getPosition(token, 8, '>') - 9);
-                    if (token.length() > 0) {
+        std::smatch result;
+        while (regex_search(content, result, regExpr)) {
+            std::unique_lock<std::mutex> guard(*locker);
 
-                        locker.lock();
-                        q_Ref.push(token);
-                        locker.unlock();
-
-                        ref.push_back(token);
-                    }
-                }
-            }
+            queueRef->push(result[1]);
+            ref.insert(result[1]);
+            content = result.suffix().str();
         }
     }
-    string getProtocol(const std::string& input) {
+    string getProtocol(const std::string& request) {
         string delimetr = "://";
-        string NAME = input.substr(0, input.find(delimetr));
+        string NAME = request.substr(0, request.find(delimetr));
         return NAME;
     }
-    string getAddress(const std::string& input) {
+    string getAddress(const std::string& request) {
         string delimetr = "://";
-        string NAME = input.substr(input.find(delimetr) + 3, input.size() - delimetr.size());
+        string NAME = request.substr(request.find(delimetr) + 3, request.size() - delimetr.size());
         return NAME;
     }
-    string getNameOfFIle(const std::string& input) {
+    string getNameOfFIle(const std::string& address) {
         int i;
-        for (i = input.size() - 1; ; --i)
-            if (input[i] == '/')
+        for (i = address.size() - 1; ; --i)
+            if (address[i] == '/')
                 break;
         i++;
-        return input.substr(i, input.size() - 1);
+        return address.substr(i, address.size() - 1);
     }
 public:
-    void copy(const std::string& input) {
+    void copy(const std::string& address) {
         std::string out(STORE);
-        out.append(getNameOfFIle(input));
+        out.append(getNameOfFIle(address));
 
         ofstream fout(out);
         fout << content;
         fout.close();
     }
-    void buildPage(const std::string& input) {
-        content = "";
-        ref.clear();
-        string full = string(PATH).append(getAddress(input));
+    static Web_page buildPage(const std::string& input, mutex& lock, queue<string>& q_Ref) {
+        Web_page web;
+        web.queueRef = &q_Ref;
+        web.locker = &lock;
+        web.content = "";
+        web.ref.clear();
+        string full = string(PATH).append(web.getAddress(input));
         ifstream fin(full);
-        content = string(istreambuf_iterator<char>(fin), istreambuf_iterator<char>());
+        web.content = string(istreambuf_iterator<char>(fin), istreambuf_iterator<char>());
         fin.close();
-        getReference();
+        web.getReference();
+        return web;
     }
-    Web_page() {  }
-    ~Web_page() {
-        content.clear();
-        ref.clear();
-    }
+    Web_page() { }
+    ~Web_page() { }
 };
 
-bool oneIsWorking() {
-    for (auto i = threadMap.begin(); i != threadMap.end(); i++)
-        if (i->second == true) {
-            return true;
-        }
-
-    return false;
-}
-
-void startProgram() {
+void startProgram(map<std::thread::id, bool>& threadMap, set<string>& wasHere,
+                  queue<string>& q_Ref, mutex& locker) {
     auto this_id = std::this_thread::get_id();
     Web_page web;
-    while (oneIsWorking()) {
-        while (true) {
-            locker.lock();
-            if (q_Ref.empty()) {
-                locker.unlock();
-                break;
-            }
 
-            threadMap[this_id] = true;
-            string str = q_Ref.front();
-            q_Ref.pop();
+    while (true) {
+        locker.lock();
+        if (q_Ref.empty()) {
             locker.unlock();
-
-            if (wasHere[str] == false) {
-                locker.lock();
-                wasHere[str] = true;
-                locker.unlock();
-
-                web.buildPage(str);
-            }
+            break;
         }
-        threadMap[this_id] = false;
+
+        threadMap[this_id] = true;
+        string str = q_Ref.front();
+        q_Ref.pop();
+        locker.unlock();
+
+        std::unique_lock<std::mutex> guard(locker);
+        if (wasHere.count(str) == 0) {
+            wasHere.insert(str);
+            guard.unlock();
+
+            web = Web_page::buildPage(str, locker, q_Ref);
+        }
     }
+    threadMap[this_id] = false;
 }
 
 int main()
 {
+    int countThread;
+    queue<string> q_Ref;
+    set<string> wasHere;
+    map<std::thread::id, bool> threadMap;
+    vector<thread> Threads;
+    vector<bool> isWorking;
+    mutex locker;
+
     string start;
     ifstream fin("input.txt");
     fin >> start >> countThread;
     fin.close();
     q_Ref.push(start);
-    Threads.resize(countThread);
     isWorking.resize(countThread);
 
     auto time_start = std::chrono::system_clock::now();
     for (int i = 0; i < countThread; i++) {
-        Threads[i] = new thread(startProgram);
-        auto id = Threads[i]->get_id();
+        Threads.emplace_back(startProgram, ref(threadMap), ref(wasHere), ref(q_Ref), ref(locker));
+        auto id = Threads[i].get_id();
         threadMap[id] = true;
     }
     for (int i = 0; i < countThread; i++)
-        Threads[i]->join();
+        Threads[i].join();
     auto time_end = std::chrono::system_clock::now();
-
-    for (int i = 0; i < countThread; i++)
-        Threads[i]->~thread();
 
     std::chrono::duration<double> time = time_end - time_start;
     ofstream fout("output.txt");
