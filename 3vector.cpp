@@ -50,17 +50,11 @@ void CVector<T> ::push_back(T data) {
 
 template <typename T>
 void CVector<T> ::erase(size_t index) {
-    T* p_new = p_vector;
     size = size - 1;
-    p_vector = new T[total_size];
-
-    for (size_t i = 0; i < index; i++)
-        p_vector[i] = p_new[i];
-
     for (size_t i = index; i < size; i++)
-        p_vector[i] = p_new[i + 1];
-    delete[] p_new;
+        p_vector[i] = p_vector[i + 1];
 }
+
 
 template <typename T>
 CVector<T>::CVector(size_t s)
