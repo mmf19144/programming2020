@@ -16,17 +16,19 @@ using namespace std;
 
 class Web_page {
 private:
-    mutex* locker;
-    queue<string>* queueRef;
+    mutex *locker;
+    queue<string> *queueRef;
     std::string content;
     std::set<std::string> ref;
-    int getPosition(const std::string& str, const int& i1, char symb) {
+
+    int getPosition(const std::string &str, const int &i1, char symb) {
         for (int i = i1; i < str.length(); i++) {
             if (str[i] == symb)
                 return i;
         }
         return i1;
     }
+
     void getReference() {
         std::smatch result;
         while (regex_search(content, result, regExpr)) {
@@ -37,26 +39,30 @@ private:
             content = result.suffix().str();
         }
     }
-    string getProtocol(const std::string& request) {
+
+    string getProtocol(const std::string &request) {
         string delimetr = "://";
         string NAME = request.substr(0, request.find(delimetr));
         return NAME;
     }
-    string getAddress(const std::string& request) {
+
+    string getAddress(const std::string &request) {
         string delimetr = "://";
         string NAME = request.substr(request.find(delimetr) + 3, request.size() - delimetr.size());
         return NAME;
     }
-    string getNameOfFIle(const std::string& address) {
+
+    string getNameOfFIle(const std::string &address) {
         int i;
-        for (i = address.size() - 1; ; --i)
+        for (i = address.size() - 1;; --i)
             if (address[i] == '/')
                 break;
         i++;
         return address.substr(i, address.size() - 1);
     }
+
 public:
-    void copy(const std::string& address) {
+    void copy(const std::string &address) {
         std::string out(STORE);
         out.append(getNameOfFIle(address));
 
@@ -64,7 +70,8 @@ public:
         fout << content;
         fout.close();
     }
-    static Web_page buildPage(const std::string& input, mutex& lock, queue<string>& q_Ref) {
+
+    static Web_page buildPage(const std::string &input, mutex &lock, queue<string> &q_Ref) {
         Web_page web;
         web.queueRef = &q_Ref;
         web.locker = &lock;
@@ -77,40 +84,66 @@ public:
         web.getReference();
         return web;
     }
-    Web_page() { }
-    ~Web_page() { }
+
+    ~Web_page() = default;
+
+
 };
 
-void startProgram(map<std::thread::id, bool>& threadMap, set<string>& wasHere,
-                  queue<string>& q_Ref, mutex& locker) {
+bool oneIsWorking(map<std::thread::id, bool> &threadMap, mutex &locker) {
+    std::unique_lock<std::mutex> guard(locker);
+    for (auto i : threadMap)
+        if (i.second) {
+            return true;
+        }
+
+    return false;
+}
+
+void startProgram(map<std::thread::id, bool> &threadMap, set<string> &wasHere,
+                  queue<string> &q_Ref, mutex &locker) {
     auto this_id = std::this_thread::get_id();
     Web_page web;
 
-    while (true) {
-        locker.lock();
-        if (q_Ref.empty()) {
-            locker.unlock();
-            break;
+    while (oneIsWorking(threadMap, locker)) {
+        string str;
+        {
+            std::unique_lock<std::mutex> guard(locker);
+            if (q_Ref.empty()) {
+                break;
+            }
+            threadMap[this_id] = true;
+            str = q_Ref.front();
+            q_Ref.pop();
+
+//            cout << str << endl;
         }
+//        locker.lock();
+//        if (q_Ref.empty()) {
+//            locker.unlock();
+//            break;
+//        }
+//
+//        threadMap[this_id] = true;
+//        string str = q_Ref.front();
+//        q_Ref.pop();
+//
+//        cout << str << endl;
+//
+//        locker.unlock();
 
-        threadMap[this_id] = true;
-        string str = q_Ref.front();
-        q_Ref.pop();
-        locker.unlock();
 
-        std::unique_lock<std::mutex> guard(locker);
         if (wasHere.count(str) == 0) {
+            std::unique_lock<std::mutex> guard(locker);
             wasHere.insert(str);
             guard.unlock();
-
             web = Web_page::buildPage(str, locker, q_Ref);
         }
     }
     threadMap[this_id] = false;
 }
 
-int main()
-{
+int main() {
     int countThread;
     queue<string> q_Ref;
     set<string> wasHere;
