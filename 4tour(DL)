@@ -321,6 +321,6 @@ int main() {
 	catch (exception e) {
 		fout << "ERROR" << endl;
 	}
-
+	delete e;
 	return 0;
 }
