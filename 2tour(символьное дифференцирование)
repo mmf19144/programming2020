@@ -10,12 +10,68 @@
 
 using namespace std;
 
+vector <string> getlex0(const string& st) {
+	vector <string> res;
+	string lexem;
+	if(st[0]!=' ')
+		lexem += st[0];
+	for (int i = 1; i < st.length(); ++i) {
+		if (isdigit(st[i - 1]) && isdigit(st[i])) {
+			lexem += st[i];
+		}
+		else if (isalpha(st[i - 1]) && isalpha(st[i])) {
+			lexem += st[i];
+		}
+		else if(st[i]==' '){
+			if (lexem != "")
+				res.push_back(lexem);
+			lexem = "";
+		}
+		else if (st[i] == ';') {
+			if (lexem != "")
+				res.push_back(lexem);
+			lexem = "";
+			lexem += st[i];
+		}
+		else if ((st[i] == '-')&&(st[i-1]=='<')) {
+			lexem += st[i];
+		}
+		else if (st[i] == '<') {
+			if (lexem != "")
+				res.push_back(lexem);
+			lexem = "";
+			lexem += st[i];
+		}
+		else {
+			if (lexem != "")
+				res.push_back(lexem);
+			lexem = "";
+			lexem += st[i];
+		}
+	}
+	if (lexem != "") {
+		if (lexem != "")
+			res.push_back(lexem);
+	}
+	
+	return res;
+}
+
+unordered_map<string, int> into_map(const string& s0) {
+	vector <string> s = getlex0(s0);
+	unordered_map<string, int> res;
+	for (int i = 0; i < s.size(); i += 4) {
+		res[s[i]] = atoi(s[i + 2].c_str());
+	}
+	return res;
+}
+
 class Expression {
 public:
-	virtual void print(std::ostream &out) const = 0;
+	virtual void print(std::ostream& out) const = 0;
 	virtual Expression* der(string X) const = 0;
 	virtual Expression* copy() const = 0;
-	virtual int eval(const unordered_map<string, int>& values) const = 0;
+	virtual int eval(const string & values) const = 0;
 	virtual ~Expression() {}
 };
 
@@ -29,7 +85,7 @@ public:
 	virtual Expression* der(string X) const override {
 		return new Number(0);
 	}
-	virtual int eval(const unordered_map<string, int>& values) const override {
+	virtual int eval(const string & values) const override {
 		return num;
 	}
 	virtual Expression* copy() const override {
@@ -53,8 +109,8 @@ public:
 		}
 		else return new Number(0);
 	}
-	virtual int eval(const unordered_map<string, int>& values) const override {
-		return values.find(var)->second;
+	virtual int eval(const string & values) const override {
+		return into_map(values).find(var)->second;
 	}
 	virtual Expression* copy() const override {
 		return new Variable(var);
@@ -69,7 +125,7 @@ private:
 	Expression* s1;
 	Expression* s2;
 public:
-	virtual void print(std::ostream &out) const override {
+	virtual void print(std::ostream& out) const override {
 		out << "(";
 		s1->print(out);
 		out << "+";
@@ -79,7 +135,7 @@ public:
 	virtual Expression* der(string X) const override {
 		return new Add(s1->der(X), s2->der(X));
 	}
-	virtual int eval(const unordered_map<string, int>& values) const override {
+	virtual int eval(const string & values) const override {
 		return s1->eval(values) + s2->eval(values);
 	}
 	Add(Expression* s10, Expression* s20) {
@@ -100,7 +156,7 @@ private:
 	Expression* s1;
 	Expression* s2;
 public:
-	virtual void print(std::ostream &out) const override {
+	virtual void print(std::ostream& out) const override {
 		out << "(";
 		s1->print(out);
 		out << "-";
@@ -110,7 +166,7 @@ public:
 	virtual Expression* der(string X) const override {
 		return new Sub(s1->der(X), s2->der(X));
 	}
-	virtual int eval(const unordered_map<string, int>& values) const override {
+	virtual int eval(const string & values) const override {
 		return s1->eval(values) - s2->eval(values);
 	}
 	Sub(Expression* s10, Expression* s20) {
@@ -131,7 +187,7 @@ private:
 	Expression* s1;
 	Expression* s2;
 public:
-	virtual void print(std::ostream &out) const override {
+	virtual void print(std::ostream& out) const override {
 		out << "(";
 		s1->print(out);
 		out << "*";
@@ -141,7 +197,7 @@ public:
 	virtual Expression* der(string X) const override {
 		return new Add(new Mul(s1->der(X), s2->copy()), new Mul(s1->copy(), s2->der(X)));
 	}
-	virtual int eval(const unordered_map<string, int>& values) const override {
+	virtual int eval(const string & values) const override {
 		return s1->eval(values) * s2->eval(values);
 	}
 	Mul(Expression* s10, Expression* s20) {
@@ -162,7 +218,7 @@ private:
 	Expression* s1;
 	Expression* s2;
 public:
-	virtual void print(std::ostream &out) const override {
+	virtual void print(std::ostream& out) const override {
 		out << "(";
 		s1->print(out);
 		out << "/";
@@ -178,7 +234,7 @@ public:
 			new Mul(s1->copy(), s2->copy())
 		);
 	}
-	virtual int eval(const unordered_map<string, int>& values) const override {
+	virtual int eval(const string & values) const override {
 		return s1->eval(values) * s2->eval(values);
 	}
 	Div(Expression* s10, Expression* s20) {
@@ -264,6 +320,8 @@ int main() {
 
 	Expression* st = read(str);
 	Expression* dst = st->der("x");
+
+	//cout<<dst->eval("y<-10; x<-20");
 
 	dst->print(fout);
 
