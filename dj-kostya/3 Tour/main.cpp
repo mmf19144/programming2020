@@ -10,9 +10,15 @@
 
 
 //#define DEBUG
-//#define ADDITIONAL_TASK
-#ifdef ADDITIONAL_TASK
+
+#define MULTIMAP_AVAILABLE
+
+
+#define MATRIX_AVAILABLE
+#ifdef MATRIX_AVAILABLE
+
 #include "Matrix.cpp"
+
 #endif
 
 template<typename T>
@@ -78,7 +84,9 @@ public:
     class Iterator : public std::iterator<std::input_iterator_tag, T> {
     private:
         friend class List<T>;
+
         Node *current;
+
     public:
         Iterator() : current(nullptr) {}
 
@@ -115,13 +123,14 @@ public:
         Node *getCurrentPtr() { return current; }
     };
 
-    List<T>::Iterator begin() {
+    virtual List<T>::Iterator begin() {
         return List<T>::Iterator(*this);
     }
 
-    List<T>::Iterator end() {
+    virtual List<T>::Iterator end() {
         return List<T>::Iterator();
     }
+
 
     template<typename Key>
     bool isExist(Key val) {
@@ -129,7 +138,7 @@ public:
                            [&val](auto v) { return v.first == val; }); // не сильно хорошо, что зашиваю логику в класс
     }
 
-    void popByValue(T val) {
+    virtual void popByValue(T val) {
         for (auto it = begin(), it_end = end(); it != it_end; ++it) {
             if ((*it).first == val.first) {
                 if (it == begin()) {
@@ -154,6 +163,99 @@ public:
 };
 
 
+#ifdef MULTIMAP_AVAILABLE
+
+template<typename T>
+class MultiList : public List<T> {
+
+public:
+
+    class Iterator : public std::iterator<std::input_iterator_tag, T> {
+    private:
+        friend class List<T>;
+
+        typename List<T>::Node *current;
+    public:
+        Iterator() : current(nullptr) {}
+
+        explicit Iterator(List<T> &l) : current(l.head.get()) {}
+
+        Iterator(MultiList<T>::Iterator const &other) : current(other.current) {}
+
+        T &operator*() {
+            return this->current->getValue();
+        }
+
+
+        Iterator operator++() {
+            if (current) {
+                current = current->getNextRawPtr();
+            }
+            return *this;
+        }
+
+        Iterator operator--() {
+            if (current)
+                current--;
+            return *this;
+        }
+
+        bool operator==(MultiList<T>::Iterator const &other) {
+            return this->current == other.current;
+        }
+
+        bool operator!=(MultiList<T>::Iterator const &other) {
+            return this->current != other.current;
+        }
+
+        typename List<T>::Node *getCurrentPtr() { return current; }
+    };
+
+    MultiList<T>::Iterator begin() {
+        return MultiList<T>::Iterator(*this);
+    }
+
+    MultiList<T>::Iterator end() {
+        return MultiList<T>::Iterator();
+    }
+
+
+    void popByValue(T val) override {
+        for (auto it = begin(), it_end = end(); it != it_end; ++it) {
+            if ((*it).first == val.first) {
+                if (it == begin()) {
+                    this->popFront();
+                } else {
+                    typename List<T>::Node *prev = (--it).getCurrentPtr();
+                    prev->setNext(std::move(it.getCurrentPtr()->getNext()));
+                }
+
+            }
+        }
+    }
+
+    void popByPair(T val) {
+        for (auto it = begin(), it_end = end(); it != it_end; ++it) {
+            if ((*it) == val) {
+                if (it == begin()) {
+                    this->popFront();
+                } else {
+                    typename List<T>::Node *prev = (--it).getCurrentPtr();
+                    prev->setNext(std::move(it.getCurrentPtr()->getNext()));
+                }
+                return;
+            }
+        }
+    }
+
+    bool isExistByPair(T val) {
+        return std::any_of(begin(), end(),
+                           [&val](auto v) { return v == val; }); // не сильно хорошо, что зашиваю логику в класс
+    }
+};
+
+#endif
+
 template<typename Key, typename Value>
 class hash_map {
 private:
@@ -161,16 +263,14 @@ private:
     float rehash_value;
     size_t size;
     size_t capacity = 0;
-    size_t key_capacity = 0;
 
-    void rehash() {
+    virtual void rehash() {
         hash_map<Key, Value> new_table(size * 2, rehash_value);
         for (const auto &it: *this) {
             new_table.insert(it.first, it.second);
         }
         std::swap(data, new_table.data);
         capacity = new_table.capacity;
-        key_capacity = new_table.key_capacity;
         size = new_table.size;
     }
 
@@ -189,7 +289,7 @@ public:
         delete[] data;
     }
 
-    void insert(Key k, Value v) {
+    virtual void insert(Key k, Value v) {
         size_t key_hash = hash(k);
         std::pair<Key, Value> a(k, v);
 
@@ -201,11 +301,10 @@ public:
             data[key_hash][a].second = v;
         } else {
             capacity++;
-            key_capacity++;
             data[key_hash].pushFront(a);
         }
 
-        if ((float) key_capacity / size >= rehash_value)
+        if ((float) capacity / size >= rehash_value)
             rehash();
     }
 
@@ -217,8 +316,6 @@ public:
             std::pair<Key, Value> p(k, operator[](k));
             data[key_hash].popByValue(p);
             capacity--;
-            if (data[key_hash].isEmpty())
-                key_capacity--;
         }
     }
 
@@ -289,7 +386,7 @@ public:
 
     };
 
-    hash_map<Key, Value>::Iterator begin() {
+    virtual hash_map<Key, Value>::Iterator begin() {
         for (size_t i = 0; i < size; i++) {
             if (!data[i].isEmpty()) {
                 return hash_map<Key, Value>::Iterator(&data[i], &data[size]);
@@ -298,7 +395,7 @@ public:
         return end();
     }
 
-    hash_map<Key, Value>::Iterator end() {
+    virtual hash_map<Key, Value>::Iterator end() {
         return hash_map<Key, Value>::Iterator();
     }
 
@@ -307,7 +404,7 @@ public:
     }
 };
 
-#ifdef ADDITIONAL_TASK
+#ifdef MATRIX_AVAILABLE
 namespace std {
     template<>
     struct hash<Matrix> {
@@ -332,6 +429,131 @@ size_t getCntUniqValues(hash_map<Key, Value> *hm) {
     }
     return a.getCapacity();
 }
+
+#ifdef MULTIMAP_AVAILABLE
+
+template<typename Key, typename Value>
+class MultiMap : public hash_map<Key, Value> {
+
+private:
+    void rehash() {
+        MultiMap<Key, Value> new_table(this->size * 2, this->rehash_value);
+        for (const auto &it: *this) {
+            new_table.insert(it.first, it.second);
+        }
+        std::swap(this->data, new_table.data);
+        this->capacity = new_table.capacity;
+        this->key_capacity = new_table.key_capacity;
+        this->size = new_table.size;
+    }
+
+public:
+    class Iterator : public std::iterator<std::input_iterator_tag, std::pair<Key, Value>> {
+    private:
+        friend class MultiMap<Key, Value>;
+
+        MultiList<std::pair<Key, Value>> *cur_ptr;
+        MultiList<std::pair<Key, Value>> *end_ptr;
+
+        typename MultiList<std::pair<Key, Value>>::Iterator list_iter;
+        typename MultiList<std::pair<Key, Value>>::Iterator end_list_iter;
+
+    public:
+        Iterator() : cur_ptr(nullptr), end_ptr(nullptr) {}
+
+        Iterator(List<std::pair<Key, Value>> *cur_, List<std::pair<Key, Value>> *end_) :
+                cur_ptr(cur_), end_ptr(end_), list_iter(cur_->begin()), end_list_iter(cur_->end()) {}
+
+        Iterator(MultiMap<Key, Value>::Iterator const &other) : cur_ptr(other.cur_ptr),
+                                                                end_ptr(other.end_ptr),
+                                                                list_iter(other.list_iter),
+                                                                end_list_iter(other.end_list_iter) {}
+
+        std::pair<Key, Value> &operator*() {
+            return *list_iter;
+        }
+
+        Iterator operator++() {
+            if (cur_ptr != nullptr) {
+                ++list_iter;
+                if (list_iter == end_list_iter) {
+                    cur_ptr++;
+                    while (cur_ptr != end_ptr && cur_ptr->isEmpty()) {
+                        cur_ptr++;
+                    }
+                    if (cur_ptr != end_ptr) {
+                        list_iter = cur_ptr->begin();
+                        end_list_iter = cur_ptr->end();
+                    } else {
+                        cur_ptr = nullptr;
+                    }
+                }
+            }
+            return *this;
+        }
+
+        bool operator==(MultiMap<Key, Value>::Iterator const &other) {
+            return (cur_ptr == other.cur_ptr && list_iter == other.list_iter);
+        }
+
+        bool operator!=(MultiMap<Key, Value>::Iterator const &other) {
+            return !operator==(other);
+        }
+
+    };
+
+    MultiMap<Key, Value>::Iterator begin() {
+        for (size_t i = 0; i < this->size; i++) {
+            if (!this->data[i].isEmpty()) {
+                return hash_map<Key, Value>::Iterator(&this->data[i], &this->data[this->size]);
+            }
+        }
+        return end();
+    }
+
+    MultiMap<Key, Value>::Iterator end() {
+        return hash_map<Key, Value>::Iterator();
+    }
+
+    void insert(Key k, Value v) {
+        size_t key_hash = hash(k);
+        std::pair<Key, Value> a(k, v);
+        if (this->data[key_hash].isExistByPair(a)) {
+            this->data[key_hash][a].second = v;
+        } else {
+            this->capacity++;
+            this->data[key_hash].pushFront(a);
+        }
+
+        if ((float) this->capacity / this->size >= this->rehash_value)
+            rehash();
+    }
+
+    std::vector<Value> getAllByKey(Key k) {
+        std::vector<Value> a;
+        size_t key_hash = hash(k);
+        for (auto it = this->data[key_hash].begin(), it_end = this->data[key_hash].end();
+             it != it_end; ++it) {
+            if ((*it).first == k)
+                a.push_back((*it).second);
+        }
+        return a;
+    }
+
+    size_t cntElementsByKey(Key k) {
+        size_t cnt = 0;
+        size_t key_hash = hash(k);
+        for (auto it = this->data[key_hash].begin(), it_end = this->data[key_hash].end();
+             it != it_end; ++it) {
+            if ((*it).first == k)
+                cnt++;
+        }
+        return cnt;
+    }
+};
+
+#endif
+
 
 template<typename Key, typename Value>
 void run(std::istream &input, std::ostream &output) {
@@ -362,18 +584,6 @@ void run(std::istream &input, std::ostream &output) {
     output << hash_map.getCapacity() << " " << getCntUniqValues<Key, Value>(&hash_map);
 }
 
-//class my_string : public std::string {
-//};
-//
-//namespace std {
-//    template<>
-//    class hash<my_string> {
-//    public:
-//        size_t operator()(const my_string &) const {
-//            return 0xdeadbeef;
-//        }
-//    };
-//}
 
 int main() {
     char key_type, val_type;
@@ -394,7 +604,6 @@ int main() {
         run<std::string, int>(input, output);
     } else if (key_type == 'S' && val_type == 'D') {
         run<std::string, double>(input, output);
-//        run<my_string, double>(input, output);
     } else if (key_type == 'I' && val_type == 'I') {
         run<int, int>(input, output);
     } else if (key_type == 'D' && val_type == 'D') {
